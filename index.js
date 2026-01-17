@@ -1,9 +1,11 @@
-console.log('=== INDEX VERSION WITH /ME ROUTE ===');
+console.log('=== AGROV INDEX – AUTH + STORES + QR ===');
+
 import express from 'express';
 import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -49,15 +51,8 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-const adminMiddleware = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin only' });
-  }
-  next();
-};
-
 /* =========================
-   REGISTER
+   REGISTER USER (MOBILE)
 ========================= */
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
@@ -69,20 +64,61 @@ app.post('/register', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `insert into users (email, password)
-       values ($1, $2)
+      `insert into users (email, password, role)
+       values ($1, $2, 'user')
        returning id, email, role, created_at`,
       [email, hash]
     );
 
+    // init voucher balance
+    await pool.query(
+      `insert into user_vouchers (user_id) values ($1)`,
+      [result.rows[0].id]
+    );
+
     res.status(201).json(result.rows[0]);
-  } catch (err) {
+  } catch {
     res.status(400).json({ error: 'User already exists' });
   }
 });
 
 /* =========================
-   LOGIN
+   REGISTER FIRM (WEB)
+========================= */
+app.post('/register-firm', async (req, res) => {
+  const { email, password, name, pib, address } = req.body;
+  if (!email || !password || !name || !pib) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  try {
+    const hash = await bcrypt.hash(password, 10);
+
+    const userResult = await pool.query(
+      `insert into users (email, password, role)
+       values ($1, $2, 'firm')
+       returning id, email, role`,
+      [email, hash]
+    );
+
+    const firmResult = await pool.query(
+      `insert into firms (owner_user_id, name, pib, address)
+       values ($1, $2, $3, $4)
+       returning *`,
+      [userResult.rows[0].id, name, pib, address]
+    );
+
+    res.status(201).json({
+      user: userResult.rows[0],
+      firm: firmResult.rows[0],
+    });
+  } catch {
+    res.status(400).json({ error: 'Firm already exists' });
+  }
+});
+
+/* =========================
+   LOGIN (ALL)
 ========================= */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -111,7 +147,7 @@ app.post('/login', async (req, res) => {
 });
 
 /* =========================
-   ME (PROTECTED)
+   ME
 ========================= */
 app.get('/me', authMiddleware, async (req, res) => {
   const result = await pool.query(
@@ -125,38 +161,75 @@ app.get('/me', authMiddleware, async (req, res) => {
 });
 
 /* =========================
-   FIRMS (ADMIN CREATE)
+   STORES – CREATE (FIRM)
 ========================= */
-app.post('/firms', authMiddleware, adminMiddleware, async (req, res) => {
-  const { name, pib, address } = req.body;
-  if (!name || !pib) {
-    return res.status(400).json({ error: 'Missing fields' });
+app.post('/stores', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'firm') {
+    return res.status(403).json({ error: 'Firm only' });
   }
 
+  const { name, address } = req.body;
+  if (!name) return res.status(400).json({ error: 'Missing name' });
+
+  const qrToken = crypto.randomBytes(24).toString('hex');
+
   const result = await pool.query(
-    `insert into firms (name, pib, address)
-     values ($1, $2, $3)
+    `insert into stores (firm_id, name, address, qr_code)
+     values (
+       (select id from firms where owner_user_id = $1),
+       $2, $3, $4
+     )
      returning *`,
-    [name, pib, address]
+    [req.user.id, name, address, qrToken]
   );
 
   res.status(201).json(result.rows[0]);
 });
 
 /* =========================
-   USER ↔ FIRM LINK
+   STORES – LIST (FIRM)
 ========================= */
-app.post('/firms/:firmId/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
-  const { firmId, userId } = req.params;
+app.get('/stores', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'firm') {
+    return res.status(403).json({ error: 'Firm only' });
+  }
 
-  await pool.query(
-    `insert into user_firms (user_id, firm_id)
-     values ($1, $2)
-     on conflict do nothing`,
-    [userId, firmId]
+  const result = await pool.query(
+    `select id, name, address, qr_code, created_at
+     from stores
+     where firm_id = (select id from firms where owner_user_id = $1)
+     order by created_at desc`,
+    [req.user.id]
   );
 
-  res.json({ status: 'linked' });
+  res.json(result.rows);
+});
+
+/* =========================
+   SCAN QR (USER)
+========================= */
+app.post('/scan', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'user') {
+    return res.status(403).json({ error: 'User only' });
+  }
+
+  const { qr } = req.body;
+  if (!qr) return res.status(400).json({ error: 'Missing QR token' });
+
+  const result = await pool.query(
+    `select s.id as store_id, s.name as store_name,
+            f.id as firm_id, f.name as firm_name
+     from stores s
+     join firms f on f.id = s.firm_id
+     where s.qr_code = $1 and s.is_active = true`,
+    [qr]
+  );
+
+  if (!result.rows[0]) {
+    return res.status(404).json({ error: 'Invalid QR' });
+  }
+
+  res.json(result.rows[0]);
 });
 
 /* =========================
