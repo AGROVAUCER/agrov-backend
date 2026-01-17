@@ -1,4 +1,4 @@
-console.log('=== AGROV INDEX – AUTH + STORES + QR ===');
+console.log('=== AGROV BACKEND FINAL ===');
 
 import express from 'express';
 import dotenv from 'dotenv';
@@ -26,8 +26,7 @@ app.get('/health', async (req, res) => {
   try {
     await pool.query('select 1');
     res.json({ status: 'OK' });
-  } catch (err) {
-    console.error(err);
+  } catch {
     res.status(500).json({ status: 'DB ERROR' });
   }
 });
@@ -43,8 +42,7 @@ const authMiddleware = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Invalid token format' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, role }
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -56,29 +54,26 @@ const authMiddleware = (req, res, next) => {
 ========================= */
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Missing fields' });
-  }
+  if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
 
   try {
     const hash = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
+    const user = await pool.query(
       `insert into users (email, password, role)
        values ($1, $2, 'user')
-       returning id, email, role, created_at`,
+       returning id, email, role`,
       [email, hash]
     );
 
-    // init voucher balance
     await pool.query(
       `insert into user_vouchers (user_id) values ($1)`,
-      [result.rows[0].id]
+      [user.rows[0].id]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(user.rows[0]);
   } catch {
-    res.status(400).json({ error: 'User already exists' });
+    res.status(400).json({ error: 'User exists' });
   }
 });
 
@@ -94,26 +89,23 @@ app.post('/register-firm', async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10);
 
-    const userResult = await pool.query(
+    const user = await pool.query(
       `insert into users (email, password, role)
        values ($1, $2, 'firm')
        returning id, email, role`,
       [email, hash]
     );
 
-    const firmResult = await pool.query(
+    const firm = await pool.query(
       `insert into firms (owner_user_id, name, pib, address)
        values ($1, $2, $3, $4)
        returning *`,
-      [userResult.rows[0].id, name, pib, address]
+      [user.rows[0].id, name, pib, address]
     );
 
-    res.status(201).json({
-      user: userResult.rows[0],
-      firm: firmResult.rows[0],
-    });
+    res.status(201).json({ user: user.rows[0], firm: firm.rows[0] });
   } catch {
-    res.status(400).json({ error: 'Firm already exists' });
+    res.status(400).json({ error: 'Firm exists' });
   }
 });
 
@@ -122,9 +114,7 @@ app.post('/register-firm', async (req, res) => {
 ========================= */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Missing fields' });
-  }
+  if (!email || !password) return res.status(400).json({ error: 'Missing fields' });
 
   const result = await pool.query(
     'select * from users where email = $1 and is_active = true',
@@ -132,10 +122,9 @@ app.post('/login', async (req, res) => {
   );
 
   const user = result.rows[0];
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
 
   const token = jwt.sign(
     { id: user.id, role: user.role },
@@ -151,91 +140,162 @@ app.post('/login', async (req, res) => {
 ========================= */
 app.get('/me', authMiddleware, async (req, res) => {
   const result = await pool.query(
-    `select id, email, role, created_at
-     from users
-     where id = $1`,
+    'select id, email, role from users where id = $1',
     [req.user.id]
   );
-
   res.json(result.rows[0]);
 });
 
 /* =========================
-   STORES – CREATE (FIRM)
+   STORES (FIRM)
 ========================= */
 app.post('/stores', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'firm') {
-    return res.status(403).json({ error: 'Firm only' });
-  }
+  if (req.user.role !== 'firm') return res.status(403).json({ error: 'Firm only' });
 
   const { name, address } = req.body;
-  if (!name) return res.status(400).json({ error: 'Missing name' });
+  const qr = crypto.randomBytes(24).toString('hex');
 
-  const qrToken = crypto.randomBytes(24).toString('hex');
-
-  const result = await pool.query(
+  const store = await pool.query(
     `insert into stores (firm_id, name, address, qr_code)
-     values (
-       (select id from firms where owner_user_id = $1),
-       $2, $3, $4
-     )
+     values ((select id from firms where owner_user_id = $1), $2, $3, $4)
      returning *`,
-    [req.user.id, name, address, qrToken]
+    [req.user.id, name, address, qr]
   );
 
-  res.status(201).json(result.rows[0]);
+  res.status(201).json(store.rows[0]);
 });
 
-/* =========================
-   STORES – LIST (FIRM)
-========================= */
 app.get('/stores', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'firm') {
-    return res.status(403).json({ error: 'Firm only' });
-  }
+  if (req.user.role !== 'firm') return res.status(403).json({ error: 'Firm only' });
 
-  const result = await pool.query(
-    `select id, name, address, qr_code, created_at
-     from stores
-     where firm_id = (select id from firms where owner_user_id = $1)
-     order by created_at desc`,
+  const stores = await pool.query(
+    `select * from stores
+     where firm_id = (select id from firms where owner_user_id = $1)`,
     [req.user.id]
   );
 
-  res.json(result.rows);
+  res.json(stores.rows);
 });
 
 /* =========================
    SCAN QR (USER)
 ========================= */
 app.post('/scan', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'user') {
-    return res.status(403).json({ error: 'User only' });
-  }
+  if (req.user.role !== 'user') return res.status(403).json({ error: 'User only' });
 
   const { qr } = req.body;
-  if (!qr) return res.status(400).json({ error: 'Missing QR token' });
 
   const result = await pool.query(
-    `select s.id as store_id, s.name as store_name,
-            f.id as firm_id, f.name as firm_name
+    `select s.id store_id, s.name store_name,
+            f.id firm_id, f.name firm_name
      from stores s
      join firms f on f.id = s.firm_id
-     where s.qr_code = $1 and s.is_active = true`,
+     where s.qr_code = $1`,
     [qr]
   );
 
-  if (!result.rows[0]) {
-    return res.status(404).json({ error: 'Invalid QR' });
-  }
-
+  if (!result.rows[0]) return res.status(404).json({ error: 'Invalid QR' });
   res.json(result.rows[0]);
+});
+
+/* =========================
+   GIVE / TAKE TRANSACTIONS
+========================= */
+async function runTransaction(fn) {
+  try {
+    await pool.query('begin');
+    const result = await fn();
+    await pool.query('commit');
+    return result;
+  } catch (e) {
+    await pool.query('rollback');
+    throw e;
+  }
+}
+
+app.post('/transactions/give', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'firm') return res.status(403).json({ error: 'Firm only' });
+
+  const { userId, storeId, amount } = req.body;
+
+  try {
+    await runTransaction(async () => {
+      const firm = await pool.query(
+        'select id, balance from firms where owner_user_id = $1',
+        [req.user.id]
+      );
+
+      if (firm.rows[0].balance < amount) throw new Error();
+
+      await pool.query(
+        'update firms set balance = balance - $1 where id = $2',
+        [amount, firm.rows[0].id]
+      );
+
+      await pool.query(
+        'update user_vouchers set balance = balance + $1 where user_id = $2',
+        [amount, userId]
+      );
+
+      await pool.query(
+        `insert into transactions (firm_id, store_id, user_id, type, amount)
+         values ($1, $2, $3, 'GIVE', $4)`,
+        [firm.rows[0].id, storeId, userId, amount]
+      );
+    });
+
+    res.json({ status: 'GIVE OK' });
+  } catch {
+    res.status(400).json({ error: 'Transaction failed' });
+  }
+});
+
+app.post('/transactions/take', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'firm') return res.status(403).json({ error: 'Firm only' });
+
+  const { userId, storeId, amount } = req.body;
+
+  try {
+    await runTransaction(async () => {
+      const firm = await pool.query(
+        'select id from firms where owner_user_id = $1',
+        [req.user.id]
+      );
+
+      const user = await pool.query(
+        'select balance from user_vouchers where user_id = $1',
+        [userId]
+      );
+
+      if (user.rows[0].balance < amount) throw new Error();
+
+      await pool.query(
+        'update user_vouchers set balance = balance - $1 where user_id = $2',
+        [amount, userId]
+      );
+
+      await pool.query(
+        'update firms set balance = balance + $1 where id = $2',
+        [amount, firm.rows[0].id]
+      );
+
+      await pool.query(
+        `insert into transactions (firm_id, store_id, user_id, type, amount)
+         values ($1, $2, $3, 'TAKE', $4)`,
+        [firm.rows[0].id, storeId, userId, amount]
+      );
+    });
+
+    res.json({ status: 'TAKE OK' });
+  } catch {
+    res.status(400).json({ error: 'Transaction failed' });
+  }
 });
 
 /* =========================
    START
 ========================= */
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`AGROV backend running on port ${PORT}`);
 });
 
