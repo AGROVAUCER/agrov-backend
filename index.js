@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import cookieParser from 'cookie-parser';
+
 
 dotenv.config();
 const { Pool } = pkg;
