@@ -1,3 +1,5 @@
+
+
 console.log('### AGROV BACKEND DEPLOY TEST ###');
 
 import express from 'express';
@@ -15,7 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* =========================
-   HARD CORS (NO LIBRARY)
+   HARD CORS (GLOBAL)
 ========================= */
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,11 +30,23 @@ app.use((req, res, next) => {
     'GET, POST, PUT, DELETE, OPTIONS'
   );
 
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
   next();
+});
+
+/* =========================
+   EXPLICIT LOGIN PREFLIGHT
+========================= */
+app.options('/login', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'POST, OPTIONS'
+  );
+  return res.sendStatus(200);
 });
 
 /* =========================
