@@ -1,6 +1,3 @@
-// ================================
-// BACKEND — index.js (FINAL)
-// ================================
 console.log('### AGROV BACKEND FINAL ###');
 
 import express from 'express';
@@ -9,8 +6,6 @@ import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
-import fs from 'fs';
-import PDFDocument from 'pdfkit';
 
 dotenv.config();
 const { Pool } = pkg;
@@ -18,29 +13,27 @@ const { Pool } = pkg;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const ALLOWED_ORIGIN = process.env.ADMIN_ORIGIN || 'http://localhost:3000';
+
 /* =========================
-   GLOBAL CORS
+   CORS (WITH CREDENTIALS)
 ========================= */
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+    'Origin, Content-Type, Authorization'
   );
   res.setHeader(
     'Access-Control-Allow-Methods',
     'GET, POST, PUT, DELETE, OPTIONS'
   );
 
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-/* =========================
-   APP / DB
-========================= */
 app.use(express.json());
 app.use(cookieParser());
 
@@ -49,19 +42,10 @@ const pool = new Pool({
 });
 
 /* =========================
-   AUTH MIDDLEWARE
+   AUTH
 ========================= */
 const auth = (req, res, next) => {
-  let token = null;
-
-  if (req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
-  if (!token && req.cookies?.token) {
-    token = req.cookies.token;
-  }
-
+  const token = req.cookies?.token;
   if (!token) return res.sendStatus(401);
 
   try {
@@ -72,21 +56,15 @@ const auth = (req, res, next) => {
   }
 };
 
-const adminOnly = (req, res, next) => {
-  if (req.user.role !== 'admin') return res.sendStatus(403);
-  next();
-};
-
 /* =========================
    HEALTH
 ========================= */
-app.get('/health', async (_, res) => {
-  await pool.query('select 1');
+app.get('/health', (_, res) => {
   res.json({ ok: true });
 });
 
 /* =========================
-   LOGIN (FINAL)
+   LOGIN
 ========================= */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -112,7 +90,7 @@ app.post('/login', async (req, res) => {
     .cookie('token', token, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: true,
+      secure: false, // ⬅️ LOCALHOST
       path: '/',
     })
     .json({ ok: true });
@@ -121,32 +99,10 @@ app.post('/login', async (req, res) => {
 /* =========================
    ME
 ========================= */
-app.get('/me', auth, async (req, res) => {
-  const r = await pool.query(
-    'select id,email,role from users where id=$1',
-    [req.user.id]
-  );
-  res.json(r.rows[0]);
+app.get('/me', auth, (req, res) => {
+  res.json(req.user);
 });
 
-/* =========================
-   ADMIN
-========================= */
-app.get('/admin/overview', auth, adminOnly, async (_, res) => {
-  const users = await pool.query('select count(*) from users');
-  const firms = await pool.query('select count(*) from firms');
-  const tx = await pool.query('select count(*) from transactions');
-
-  res.json({
-    users: users.rows[0].count,
-    firms: firms.rows[0].count,
-    transactions: tx.rows[0].count,
-  });
-});
-
-/* =========================
-   START
-========================= */
 app.listen(PORT, () => {
   console.log('SERVER UP ON PORT', PORT);
 });
