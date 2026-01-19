@@ -1,9 +1,10 @@
+console.log('### AGROV BACKEND DEPLOY TEST ###');
 import express from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
 
@@ -13,21 +14,41 @@ const { Pool } = pkg;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+/* =========================
+   CORS — DEBUG / PROOF
+========================= */
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// preflight
+app.options('*', cors());
+
+/* =========================
+   APP / DB
+========================= */
+app.use(express.json());
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-app.use(express.json());
-
-/* AUTH */
+/* =========================
+   AUTH MIDDLEWARE
+========================= */
 const auth = (req, res, next) => {
   const h = req.headers.authorization;
   if (!h) return res.sendStatus(401);
+
   try {
     req.user = jwt.verify(h.split(' ')[1], process.env.JWT_SECRET);
     next();
   } catch {
-    res.sendStatus(401);
+    return res.sendStatus(401);
   }
 };
 
@@ -36,25 +57,48 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-/* HEALTH */
+/* =========================
+   HEALTH
+========================= */
 app.get('/health', async (_, res) => {
   await pool.query('select 1');
   res.json({ ok: true });
 });
 
-/* LOGIN */
+/* =========================
+   LOGIN
+========================= */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const r = await pool.query('select * from users where email=$1', [email]);
+
+  const r = await pool.query(
+    'select * from users where email=$1',
+    [email]
+  );
+
   const u = r.rows[0];
-  if (!u || !(await bcrypt.compare(password, u.password))) {
+
+  if (!u) {
     return res.status(401).json({ error: 'invalid' });
   }
-  const token = jwt.sign({ id: u.id, role: u.role }, process.env.JWT_SECRET);
+
+  const ok = await bcrypt.compare(password, u.password);
+  if (!ok) {
+    return res.status(401).json({ error: 'invalid' });
+  }
+
+  const token = jwt.sign(
+    { id: u.id, role: u.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
   res.json({ token });
 });
 
-/* ME */
+/* =========================
+   ME
+========================= */
 app.get('/me', auth, async (req, res) => {
   const r = await pool.query(
     'select id,email,role from users where id=$1',
@@ -64,10 +108,11 @@ app.get('/me', auth, async (req, res) => {
 });
 
 /* =========================
-   BERZA / PRODUCTS (FIRM)
+   PRODUCTS (FIRM)
 ========================= */
 app.post('/products', auth, async (req, res) => {
   if (req.user.role !== 'firm') return res.sendStatus(403);
+
   const { name, price, unit } = req.body;
 
   const firm = await pool.query(
@@ -86,6 +131,7 @@ app.post('/products', auth, async (req, res) => {
 
 app.put('/products/:id', auth, async (req, res) => {
   if (req.user.role !== 'firm') return res.sendStatus(403);
+
   const { price } = req.body;
 
   const old = await pool.query(
@@ -109,7 +155,9 @@ app.put('/products/:id', auth, async (req, res) => {
 
 app.get('/products', async (_, res) => {
   const r = await pool.query(
-    'select p.name,p.price,p.unit,f.name firm from products p join firms f on f.id=p.firm_id'
+    `select p.name,p.price,p.unit,f.name firm
+     from products p
+     join firms f on f.id=p.firm_id`
   );
   res.json(r.rows);
 });
@@ -147,7 +195,7 @@ app.get('/reports/pdf', auth, async (req, res) => {
 });
 
 /* =========================
-   ADMIN ENDPOINTS
+   ADMIN
 ========================= */
 app.get('/admin/overview', auth, adminOnly, async (_, res) => {
   const users = await pool.query('select count(*) from users');
@@ -157,7 +205,7 @@ app.get('/admin/overview', auth, adminOnly, async (_, res) => {
   res.json({
     users: users.rows[0].count,
     firms: firms.rows[0].count,
-    transactions: tx.rows[0].count
+    transactions: tx.rows[0].count,
   });
 });
 
@@ -168,4 +216,9 @@ app.get('/admin/logs', auth, adminOnly, async (_, res) => {
   res.json(r.rows);
 });
 
-app.listen(PORT, () => console.log('SERVER UP'));
+/* =========================
+   START
+========================= */
+app.listen(PORT, () => {
+  console.log('SERVER UP ON PORT', PORT);
+});
