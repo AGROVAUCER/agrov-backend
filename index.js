@@ -1,3 +1,6 @@
+// ================================
+// BACKEND — index.js (FINAL)
+// ================================
 console.log('### AGROV BACKEND FINAL ###');
 
 import express from 'express';
@@ -5,6 +8,7 @@ import dotenv from 'dotenv';
 import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
 
@@ -31,7 +35,6 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
-
   next();
 });
 
@@ -39,13 +42,14 @@ app.use((req, res, next) => {
    APP / DB
 ========================= */
 app.use(express.json());
+app.use(cookieParser());
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
 /* =========================
-   AUTH MIDDLEWARE (FINAL)
+   AUTH MIDDLEWARE
 ========================= */
 const auth = (req, res, next) => {
   let token = null;
@@ -54,9 +58,8 @@ const auth = (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
-  if (!token && req.headers.cookie) {
-    const match = req.headers.cookie.match(/token=([^;]+)/);
-    if (match) token = match[1];
+  if (!token && req.cookies?.token) {
+    token = req.cookies.token;
   }
 
   if (!token) return res.sendStatus(401);
@@ -83,7 +86,7 @@ app.get('/health', async (_, res) => {
 });
 
 /* =========================
-   LOGIN
+   LOGIN (FINAL)
 ========================= */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -94,14 +97,10 @@ app.post('/login', async (req, res) => {
   );
 
   const u = r.rows[0];
-  if (!u) {
-    return res.status(401).json({ error: 'invalid' });
-  }
+  if (!u) return res.status(401).json({ error: 'invalid' });
 
   const ok = await bcrypt.compare(password, u.password);
-  if (!ok) {
-    return res.status(401).json({ error: 'invalid' });
-  }
+  if (!ok) return res.status(401).json({ error: 'invalid' });
 
   const token = jwt.sign(
     { id: u.id, role: u.role },
@@ -109,7 +108,14 @@ app.post('/login', async (req, res) => {
     { expiresIn: '7d' }
   );
 
-  res.json({ token });
+  res
+    .cookie('token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      path: '/',
+    })
+    .json({ ok: true });
 });
 
 /* =========================
@@ -121,93 +127,6 @@ app.get('/me', auth, async (req, res) => {
     [req.user.id]
   );
   res.json(r.rows[0]);
-});
-
-/* =========================
-   PRODUCTS (FIRM)
-========================= */
-app.post('/products', auth, async (req, res) => {
-  if (req.user.role !== 'firm') return res.sendStatus(403);
-
-  const { name, price, unit } = req.body;
-
-  const firm = await pool.query(
-    'select id from firms where owner_user_id=$1',
-    [req.user.id]
-  );
-
-  const p = await pool.query(
-    `insert into products (firm_id,name,price,unit)
-     values ($1,$2,$3,$4) returning *`,
-    [firm.rows[0].id, name, price, unit]
-  );
-
-  res.json(p.rows[0]);
-});
-
-app.put('/products/:id', auth, async (req, res) => {
-  if (req.user.role !== 'firm') return res.sendStatus(403);
-
-  const { price } = req.body;
-
-  const old = await pool.query(
-    'select price from products where id=$1',
-    [req.params.id]
-  );
-
-  await pool.query(
-    'update products set price=$1 where id=$2',
-    [price, req.params.id]
-  );
-
-  await pool.query(
-    `insert into price_history (product_id,old_price,new_price)
-     values ($1,$2,$3)`,
-    [req.params.id, old.rows[0].price, price]
-  );
-
-  res.json({ ok: true });
-});
-
-app.get('/products', async (_, res) => {
-  const r = await pool.query(
-    `select p.name,p.price,p.unit,f.name firm
-     from products p
-     join firms f on f.id=p.firm_id`
-  );
-  res.json(r.rows);
-});
-
-/* =========================
-   PDF REPORT (FIRM)
-========================= */
-app.get('/reports/pdf', auth, async (req, res) => {
-  if (req.user.role !== 'firm') return res.sendStatus(403);
-
-  const firm = await pool.query(
-    'select id,name from firms where owner_user_id=$1',
-    [req.user.id]
-  );
-
-  const tx = await pool.query(
-    'select type,amount,created_at from transactions where firm_id=$1',
-    [firm.rows[0].id]
-  );
-
-  const doc = new PDFDocument();
-  const file = `/tmp/report-${Date.now()}.pdf`;
-  doc.pipe(fs.createWriteStream(file));
-
-  doc.fontSize(18).text(`Izveštaj firme: ${firm.rows[0].name}`);
-  doc.moveDown();
-
-  tx.rows.forEach(t => {
-    doc.fontSize(12).text(`${t.created_at} | ${t.type} | ${t.amount}`);
-  });
-
-  doc.end();
-
-  res.download(file);
 });
 
 /* =========================
@@ -223,13 +142,6 @@ app.get('/admin/overview', auth, adminOnly, async (_, res) => {
     firms: firms.rows[0].count,
     transactions: tx.rows[0].count,
   });
-});
-
-app.get('/admin/logs', auth, adminOnly, async (_, res) => {
-  const r = await pool.query(
-    'select * from admin_logs order by created_at desc limit 100'
-  );
-  res.json(r.rows);
 });
 
 /* =========================
