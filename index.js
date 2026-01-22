@@ -1,108 +1,121 @@
-console.log('### AGROV BACKEND FINAL ###');
+console.log('### AGROV BACKEND – FINAL ###')
 
-import express from 'express';
-import dotenv from 'dotenv';
-import pkg from 'pg';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import cookieParser from 'cookie-parser';
+import express from 'express'
+import dotenv from 'dotenv'
+import pkg from 'pg'
+import { createClient } from '@supabase/supabase-js'
 
-dotenv.config();
-const { Pool } = pkg;
+dotenv.config()
+const { Pool } = pkg
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app = express()
+const PORT = process.env.PORT || 3000
 
-const ALLOWED_ORIGIN = process.env.ADMIN_ORIGIN || 'http://localhost:3000';
+app.use(express.json())
 
-/* =========================
-   CORS (WITH CREDENTIALS)
-========================= */
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Origin, Content-Type, Authorization'
-  );
-  res.setHeader(
-    'Access-Control-Allow-Methods',
-    'GET, POST, PUT, DELETE, OPTIONS'
-  );
-
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
-
-app.use(express.json());
-app.use(cookieParser());
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  if (req.method === 'OPTIONS') return res.sendStatus(200)
+  next()
+})
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-});
+})
 
-/* =========================
-   AUTH
-========================= */
-const auth = (req, res, next) => {
-  const token = req.cookies?.token;
-  if (!token) return res.sendStatus(401);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    return res.sendStatus(401);
-  }
-};
+const requireManager = async (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token) return res.sendStatus(401)
 
-/* =========================
-   HEALTH
-========================= */
-app.get('/health', (_, res) => {
-  res.json({ ok: true });
-});
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data.user) return res.sendStatus(401)
+  if (data.user.user_metadata?.role !== 'manager') return res.sendStatus(403)
 
-/* =========================
-   LOGIN
-========================= */
-app.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  req.user = data.user
+  next()
+}
 
-  const r = await pool.query(
-    'select id,email,password,role from users where email=$1',
-    [email]
-  );
+/* HEALTH */
+app.get('/health', async (_, res) => {
+  await pool.query('select 1')
+  res.json({ ok: true })
+})
 
-  const u = r.rows[0];
-  if (!u) return res.status(401).json({ error: 'invalid' });
+/* USERS (SUPABASE) */
+app.get('/admin/users', requireManager, async (_, res) => {
+  const { data } = await supabase.auth.admin.listUsers()
+  res.json(data.users.map(u => ({
+    id: u.id,
+    email: u.email,
+    role: u.user_metadata?.role || 'user',
+    created_at: u.created_at,
+  })))
+})
 
-  const ok = await bcrypt.compare(password, u.password);
-  if (!ok) return res.status(401).json({ error: 'invalid' });
+/* COMPANIES */
+app.get('/admin/companies', requireManager, async (_, res) => {
+  const { rows } = await pool.query(
+    `select id, name, pib, created_at from companies order by created_at desc`
+  )
+  res.json(rows)
+})
 
-  const token = jwt.sign(
-    { id: u.id, role: u.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+app.post('/admin/companies', requireManager, async (req, res) => {
+  const { name, pib } = req.body
+  const { rows } = await pool.query(
+    `insert into companies (name, pib)
+     values ($1, $2)
+     returning id, name, pib, created_at`,
+    [name, pib]
+  )
+  res.status(201).json(rows[0])
+})
 
-  res
-    .cookie('token', token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false, // ⬅️ LOCALHOST
-      path: '/',
-    })
-    .json({ ok: true });
-});
+app.delete('/admin/companies/:id', requireManager, async (req, res) => {
+  await pool.query(`delete from companies where id=$1`, [req.params.id])
+  res.sendStatus(204)
+})
 
-/* =========================
-   ME
-========================= */
-app.get('/me', auth, (req, res) => {
-  res.json(req.user);
-});
+/* VOUCHERS */
+app.get('/admin/vouchers', requireManager, async (_, res) => {
+  const { rows } = await pool.query(
+    `select id, code, value, used, created_at from vouchers order by created_at desc`
+  )
+  res.json(rows)
+})
+
+app.post('/admin/vouchers', requireManager, async (req, res) => {
+  const { code, value } = req.body
+  const { rows } = await pool.query(
+    `insert into vouchers (code, value)
+     values ($1, $2)
+     returning id, code, value, used, created_at`,
+    [code, value]
+  )
+  res.status(201).json(rows[0])
+})
+
+app.put('/admin/vouchers/:id/toggle', requireManager, async (req, res) => {
+  const { rows } = await pool.query(
+    `update vouchers set used = not used where id=$1
+     returning id, code, value, used`,
+    [req.params.id]
+  )
+  res.json(rows[0])
+})
+
+app.delete('/admin/vouchers/:id', requireManager, async (req, res) => {
+  await pool.query(`delete from vouchers where id=$1`, [req.params.id])
+  res.sendStatus(204)
+})
 
 app.listen(PORT, () => {
-  console.log('SERVER UP ON PORT', PORT);
-});
+  console.log('SERVER UP ON PORT', PORT)
+})
