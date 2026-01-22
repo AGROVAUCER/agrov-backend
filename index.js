@@ -13,18 +13,19 @@ const app = express()
 const PORT = process.env.PORT || 10000
 
 /* =========================
-   CORS (FINAL)
+   CORS – FINAL (OVO RADI)
 ========================= */
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      // dodaj ovde kasnije Vercel URL admina
-      // 'https://agrov-admin.vercel.app'
-    ],
+    origin: true, // ← DOZVOLJAVA localhost, vercel, sve
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 )
+
+// ⚠️ OVO JE KLJUČNO
+app.options('*', cors())
 
 app.use(express.json())
 
@@ -44,7 +45,7 @@ const supabase = createClient(
 )
 
 /* =========================
-   AUTH – MANAGER ONLY
+   AUTH
 ========================= */
 const requireManager = async (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '')
@@ -69,23 +70,6 @@ app.get('/health', async (_, res) => {
 })
 
 /* =========================
-   USERS (SUPABASE)
-========================= */
-app.get('/admin/users', requireManager, async (_, res) => {
-  const { data, error } = await supabase.auth.admin.listUsers()
-  if (error) return res.status(500).json({ error: error.message })
-
-  res.json(
-    data.users.map(u => ({
-      id: u.id,
-      email: u.email,
-      role: u.user_metadata?.role || 'user',
-      created_at: u.created_at,
-    }))
-  )
-})
-
-/* =========================
    COMPANIES
 ========================= */
 app.get('/admin/companies', requireManager, async (_, res) => {
@@ -95,66 +79,6 @@ app.get('/admin/companies', requireManager, async (_, res) => {
      order by created_at desc`
   )
   res.json(rows)
-})
-
-app.post('/admin/companies', requireManager, async (req, res) => {
-  const { name, pib } = req.body
-
-  const { rows } = await pool.query(
-    `insert into companies (name, pib)
-     values ($1, $2)
-     returning id, name, pib, created_at`,
-    [name, pib]
-  )
-
-  res.status(201).json(rows[0])
-})
-
-app.delete('/admin/companies/:id', requireManager, async (req, res) => {
-  await pool.query(`delete from companies where id=$1`, [req.params.id])
-  res.sendStatus(204)
-})
-
-/* =========================
-   VOUCHERS
-========================= */
-app.get('/admin/vouchers', requireManager, async (_, res) => {
-  const { rows } = await pool.query(
-    `select id, code, value, used, created_at
-     from vouchers
-     order by created_at desc`
-  )
-  res.json(rows)
-})
-
-app.post('/admin/vouchers', requireManager, async (req, res) => {
-  const { code, value } = req.body
-
-  const { rows } = await pool.query(
-    `insert into vouchers (code, value)
-     values ($1, $2)
-     returning id, code, value, used, created_at`,
-    [code, value]
-  )
-
-  res.status(201).json(rows[0])
-})
-
-app.put('/admin/vouchers/:id/toggle', requireManager, async (req, res) => {
-  const { rows } = await pool.query(
-    `update vouchers
-     set used = not used
-     where id = $1
-     returning id, code, value, used`,
-    [req.params.id]
-  )
-
-  res.json(rows[0])
-})
-
-app.delete('/admin/vouchers/:id', requireManager, async (req, res) => {
-  await pool.query(`delete from vouchers where id=$1`, [req.params.id])
-  res.sendStatus(204)
 })
 
 /* =========================
