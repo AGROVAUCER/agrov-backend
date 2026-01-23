@@ -261,7 +261,7 @@ app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
 app.get('/admin/firms', requireAdmin, async (_, res) => {
   try {
     const { rows } = await pool.query(`
-      select id, name, status, created_at
+      select id, name, active, created_at
       from firms
       order by created_at desc
     `)
