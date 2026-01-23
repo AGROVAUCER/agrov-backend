@@ -261,14 +261,14 @@ app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
 app.get('/admin/firms', requireAdmin, async (_, res) => {
   try {
     const { rows } = await pool.query(`
-      select id, name, active, created_at
+      select id, name, status, active, created_at
       from firms
       order by created_at desc
     `)
     res.json(rows)
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to load firms' })
+    console.error('ADMIN FIRMS ERROR:', err.message)
+    res.status(500).json({ error: err.message })
   }
 })
 /* =========================
