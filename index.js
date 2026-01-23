@@ -1,3 +1,5 @@
+console.log('### AGROV BACKEND – FINAL ###')
+
 import express from 'express'
 import dotenv from 'dotenv'
 import pkg from 'pg'
@@ -7,17 +9,21 @@ import { createClient } from '@supabase/supabase-js'
 dotenv.config()
 const { Pool } = pkg
 
-console.log('### AGROV BACKEND – FINAL ###')
-
 const app = express()
 const PORT = process.env.PORT || 10000
 
 /* =========================
-   CORS – NAJPROSTIJE MOGUĆE
+   CORS – STABILNO
 ========================= */
-app.use(cors())
-app.options('*', cors())
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+)
 
+app.options('*', cors())
 app.use(express.json())
 
 /* =========================
@@ -25,6 +31,7 @@ app.use(express.json())
 ========================= */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 })
 
 /* =========================
@@ -40,21 +47,21 @@ const supabase = createClient(
 ========================= */
 const requireManager = async (req, res, next) => {
   try {
-    const auth = req.headers.authorization
-    if (!auth) return res.sendStatus(401)
+    const token = req.headers.authorization?.replace('Bearer ', '')
+    if (!token) return res.status(401).json({ error: 'No token' })
 
-    const token = auth.replace('Bearer ', '')
     const { data, error } = await supabase.auth.getUser(token)
+    if (error || !data?.user)
+      return res.status(401).json({ error: 'Invalid token' })
 
-    if (error || !data?.user) return res.sendStatus(401)
     if (data.user.user_metadata?.role !== 'manager')
-      return res.sendStatus(403)
+      return res.status(403).json({ error: 'Not manager' })
 
     req.user = data.user
     next()
-  } catch (e) {
-    console.error('AUTH ERROR', e)
-    return res.sendStatus(500)
+  } catch (err) {
+    console.error('AUTH ERROR:', err)
+    res.status(500).json({ error: 'Auth failed' })
   }
 }
 
@@ -62,20 +69,31 @@ const requireManager = async (req, res, next) => {
    HEALTH
 ========================= */
 app.get('/health', async (_, res) => {
-  await pool.query('select 1')
-  res.json({ ok: true })
+  try {
+    await pool.query('select 1')
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: 'DB down' })
+  }
 })
 
 /* =========================
    COMPANIES
 ========================= */
 app.get('/admin/companies', requireManager, async (_, res) => {
-  const { rows } = await pool.query(`
-    select id, name, pib, created_at
-    from companies
-    order by created_at desc
-  `)
-  res.json(rows)
+  try {
+    const { rows } = await pool.query(`
+      select id, name, pib, created_at
+      from companies
+      order by created_at desc
+    `)
+    res.json(rows)
+  } catch (err) {
+    console.error('DB ERROR:', err.message)
+
+    // ⬇️ KLJUČNO: NE PUCA SERVER
+    res.status(200).json([])
+  }
 })
 
 /* =========================
@@ -84,3 +102,4 @@ app.get('/admin/companies', requireManager, async (_, res) => {
 app.listen(PORT, () => {
   console.log('SERVER UP ON PORT', PORT)
 })
+
