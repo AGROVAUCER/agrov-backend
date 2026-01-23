@@ -255,7 +255,22 @@ app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Balance failed' })
   }
 })
-
+/* =========================
+   ADMIN – LIST FIRMS
+========================= */
+app.get('/admin/firms', requireAdmin, async (_, res) => {
+  try {
+    const { rows } = await pool.query(`
+      select id, name, status, created_at
+      from firms
+      order by created_at desc
+    `)
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to load firms' })
+  }
+})
 /* =========================
    START
 ========================= */
