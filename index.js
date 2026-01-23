@@ -1,4 +1,4 @@
-console.log('### AGROV BACKEND – SUPABASE ONLY FINAL ###')
+console.log('### AGROV BACKEND – SUPABASE FINAL ###')
 
 import express from 'express'
 import dotenv from 'dotenv'
@@ -50,7 +50,6 @@ const requireAdmin = async (req, res, next) => {
     req.user = data.user
     next()
   } catch (e) {
-    console.error('AUTH ERROR:', e)
     res.status(500).json({ error: 'Auth failed' })
   }
 }
@@ -63,69 +62,152 @@ app.get('/health', (_, res) => {
 })
 
 /* =========================
-   ADMIN – LIST FIRMS
+   FIRMS – CREATE (SELF)
 ========================= */
-app.get('/admin/firms', requireAdmin, async (_, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('firms')
-      .select('id, name, status, active, created_at')
-      .order('created_at', { ascending: false })
+app.post('/firms', async (req, res) => {
+  const { name } = req.body
+  if (!name) return res.status(400).json({ error: 'Name required' })
 
-    if (error) throw error
-    res.json(data)
-  } catch (e) {
-    console.error('ADMIN FIRMS ERROR:', e.message)
-    res.status(500).json({ error: e.message })
-  }
+  const { data, error } = await supabase
+    .from('firms')
+    .insert({
+      name,
+      status: 'pending',
+      active: false,
+    })
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
 })
 
 /* =========================
-   CREATE FIRM (SELF)
+   ADMIN – LIST FIRMS
 ========================= */
-app.post('/firms', async (req, res) => {
-  try {
-    const { name } = req.body
-    if (!name) return res.status(400).json({ error: 'Name required' })
+app.get('/admin/firms', requireAdmin, async (_, res) => {
+  const { data, error } = await supabase
+    .from('firms')
+    .select('id, name, status, active, created_at')
+    .order('created_at', { ascending: false })
 
-    const { data, error } = await supabase
-      .from('firms')
-      .insert({
-        name,
-        status: 'pending',
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    res.json(data)
-  } catch (e) {
-    console.error('CREATE FIRM ERROR:', e.message)
-    res.status(500).json({ error: e.message })
-  }
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
 })
 
 /* =========================
    ADMIN – APPROVE FIRM
 ========================= */
 app.post('/admin/firms/:id/approve', requireAdmin, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('firms')
-      .update({ status: 'active' })
-      .eq('id', req.params.id)
-      .eq('status', 'pending')
-      .select()
-      .single()
+  const { data, error } = await supabase
+    .from('firms')
+    .update({ status: 'active', active: true })
+    .eq('id', req.params.id)
+    .eq('status', 'pending')
+    .select()
+    .single()
 
-    if (error || !data)
-      return res.status(400).json({ error: 'Invalid state' })
+  if (error || !data)
+    return res.status(400).json({ error: 'Invalid state' })
 
-    res.json(data)
-  } catch (e) {
-    console.error('APPROVE FIRM ERROR:', e.message)
-    res.status(500).json({ error: e.message })
-  }
+  res.json(data)
+})
+
+/* =========================
+   STORES – CREATE (SELF)
+========================= */
+app.post('/firms/:id/stores', async (req, res) => {
+  const { name } = req.body
+  if (!name) return res.status(400).json({ error: 'Name required' })
+
+  const { data, error } = await supabase
+    .from('stores')
+    .insert({
+      firm_id: req.params.id,
+      name,
+      status: 'pending',
+      active: false,
+    })
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+/* =========================
+   ADMIN – APPROVE STORE
+========================= */
+app.post('/admin/stores/:id/approve', requireAdmin, async (req, res) => {
+  const { data, error } = await supabase
+    .from('stores')
+    .update({ status: 'active', active: true })
+    .eq('id', req.params.id)
+    .eq('status', 'pending')
+    .select()
+    .single()
+
+  if (error || !data)
+    return res.status(400).json({ error: 'Invalid state' })
+
+  res.json(data)
+})
+
+/* =========================
+   TRANSACTIONS – GIVE / TAKE
+========================= */
+app.post('/transactions', requireAdmin, async (req, res) => {
+  const { firm_id, store_id, user_id, amount, type } = req.body
+
+  if (!['GIVE', 'TAKE'].includes(type))
+    return res.status(400).json({ error: 'Invalid type' })
+
+  if (!amount || amount <= 0)
+    return res.status(400).json({ error: 'Invalid amount' })
+
+  const { data: store } = await supabase
+    .from('stores')
+    .select('status, firm_id')
+    .eq('id', store_id)
+    .single()
+
+  if (!store || store.status !== 'active')
+    return res.status(403).json({ error: 'Inactive store' })
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert({
+      firm_id,
+      store_id,
+      user_id,
+      amount,
+      type,
+    })
+    .select()
+    .single()
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+/* =========================
+   BALANCE – FIRM
+========================= */
+app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('amount, type')
+    .eq('firm_id', req.params.id)
+
+  if (error) return res.status(500).json({ error: error.message })
+
+  const balance = data.reduce((sum, t) => {
+    if (t.type === 'TAKE') return sum + t.amount
+    if (t.type === 'GIVE') return sum - t.amount
+    return sum
+  }, 0)
+
+  res.json({ firm_id: req.params.id, balance })
 })
 
 /* =========================
@@ -134,4 +216,3 @@ app.post('/admin/firms/:id/approve', requireAdmin, async (req, res) => {
 app.listen(PORT, () => {
   console.log('SERVER UP ON PORT', PORT)
 })
-
