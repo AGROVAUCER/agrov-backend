@@ -13,17 +13,9 @@ const app = express()
 const PORT = process.env.PORT || 10000
 
 /* =========================
-   CORS – ISPRAVNO (BEZ credentials)
+   CORS – NAJPROSTIJE MOGUĆE
 ========================= */
-app.use(
-  cors({
-    origin: 'https://agrov-admin.vercel.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-)
-
-// preflight
+app.use(cors())
 app.options('*', cors())
 
 app.use(express.json())
@@ -36,7 +28,7 @@ const pool = new Pool({
 })
 
 /* =========================
-   SUPABASE (SERVICE ROLE)
+   SUPABASE
 ========================= */
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -44,27 +36,24 @@ const supabase = createClient(
 )
 
 /* =========================
-   AUTH (MANAGER)
+   AUTH
 ========================= */
 const requireManager = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization
-    if (!authHeader) return res.sendStatus(401)
+    const auth = req.headers.authorization
+    if (!auth) return res.sendStatus(401)
 
-    const token = authHeader.replace('Bearer ', '')
-    if (!token) return res.sendStatus(401)
-
+    const token = auth.replace('Bearer ', '')
     const { data, error } = await supabase.auth.getUser(token)
-    if (error || !data?.user) return res.sendStatus(401)
 
-    if (data.user.user_metadata?.role !== 'manager') {
+    if (error || !data?.user) return res.sendStatus(401)
+    if (data.user.user_metadata?.role !== 'manager')
       return res.sendStatus(403)
-    }
 
     req.user = data.user
     next()
-  } catch (err) {
-    console.error('AUTH ERROR:', err)
+  } catch (e) {
+    console.error('AUTH ERROR', e)
     return res.sendStatus(500)
   }
 }
@@ -86,7 +75,6 @@ app.get('/admin/companies', requireManager, async (_, res) => {
     from companies
     order by created_at desc
   `)
-
   res.json(rows)
 })
 
