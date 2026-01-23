@@ -1,5 +1,3 @@
-console.log('### AGROV BACKEND – FINAL ###')
-
 import express from 'express'
 import dotenv from 'dotenv'
 import pkg from 'pg'
@@ -9,22 +7,23 @@ import { createClient } from '@supabase/supabase-js'
 dotenv.config()
 const { Pool } = pkg
 
+console.log('### AGROV BACKEND – FINAL ###')
+
 const app = express()
 const PORT = process.env.PORT || 10000
 
 /* =========================
-   CORS – FINAL (OVO RADI)
+   CORS – ISPRAVNO (BEZ credentials)
 ========================= */
 app.use(
   cors({
-    origin: true, // ← DOZVOLJAVA localhost, vercel, sve
-    credentials: true,
+    origin: 'https://agrov-admin.vercel.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 )
 
-// ⚠️ OVO JE KLJUČNO
+// preflight
 app.options('*', cors())
 
 app.use(express.json())
@@ -37,7 +36,7 @@ const pool = new Pool({
 })
 
 /* =========================
-   SUPABASE
+   SUPABASE (SERVICE ROLE)
 ========================= */
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -45,20 +44,29 @@ const supabase = createClient(
 )
 
 /* =========================
-   AUTH
+   AUTH (MANAGER)
 ========================= */
 const requireManager = async (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token) return res.sendStatus(401)
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader) return res.sendStatus(401)
 
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) return res.sendStatus(401)
+    const token = authHeader.replace('Bearer ', '')
+    if (!token) return res.sendStatus(401)
 
-  if (data.user.user_metadata?.role !== 'manager')
-    return res.sendStatus(403)
+    const { data, error } = await supabase.auth.getUser(token)
+    if (error || !data?.user) return res.sendStatus(401)
 
-  req.user = data.user
-  next()
+    if (data.user.user_metadata?.role !== 'manager') {
+      return res.sendStatus(403)
+    }
+
+    req.user = data.user
+    next()
+  } catch (err) {
+    console.error('AUTH ERROR:', err)
+    return res.sendStatus(500)
+  }
 }
 
 /* =========================
@@ -73,11 +81,12 @@ app.get('/health', async (_, res) => {
    COMPANIES
 ========================= */
 app.get('/admin/companies', requireManager, async (_, res) => {
-  const { rows } = await pool.query(
-    `select id, name, pib, created_at
-     from companies
-     order by created_at desc`
-  )
+  const { rows } = await pool.query(`
+    select id, name, pib, created_at
+    from companies
+    order by created_at desc
+  `)
+
   res.json(rows)
 })
 
