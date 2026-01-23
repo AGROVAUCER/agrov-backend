@@ -1,8 +1,7 @@
-console.log('### AGROV BACKEND – FINAL ###')
+console.log('### AGROV BACKEND – SUPABASE ONLY FINAL ###')
 
 import express from 'express'
 import dotenv from 'dotenv'
-import { Pool } from 'pg'
 import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 
@@ -25,15 +24,7 @@ app.options('*', cors())
 app.use(express.json())
 
 /* =========================
-   DB
-========================= */
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-})
-
-/* =========================
-   SUPABASE AUTH
+   SUPABASE (SERVICE ROLE)
 ========================= */
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -59,7 +50,7 @@ const requireAdmin = async (req, res, next) => {
     req.user = data.user
     next()
   } catch (e) {
-    console.error(e)
+    console.error('AUTH ERROR:', e)
     res.status(500).json({ error: 'Auth failed' })
   }
 }
@@ -67,14 +58,8 @@ const requireAdmin = async (req, res, next) => {
 /* =========================
    HEALTH
 ========================= */
-app.get('/health', async (_, res) => {
-  try {
-    await pool.query('select 1')
-    res.json({ ok: true })
-  } catch (e) {
-    console.error(e)
-    res.status(500).json({ error: 'DB down' })
-  }
+app.get('/health', (_, res) => {
+  res.json({ ok: true })
 })
 
 /* =========================
@@ -82,15 +67,64 @@ app.get('/health', async (_, res) => {
 ========================= */
 app.get('/admin/firms', requireAdmin, async (_, res) => {
   try {
-    const { rows } = await pool.query(`
-      select id, name, status, active, created_at
-      from firms
-      order by created_at desc
-    `)
-    res.json(rows)
-  } catch (err) {
-    console.error('ADMIN FIRMS ERROR:', err.message)
-    res.status(500).json({ error: err.message })
+    const { data, error } = await supabase
+      .from('firms')
+      .select('id, name, status, active, created_at')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    res.json(data)
+  } catch (e) {
+    console.error('ADMIN FIRMS ERROR:', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+/* =========================
+   CREATE FIRM (SELF)
+========================= */
+app.post('/firms', async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name) return res.status(400).json({ error: 'Name required' })
+
+    const { data, error } = await supabase
+      .from('firms')
+      .insert({
+        name,
+        status: 'pending',
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    res.json(data)
+  } catch (e) {
+    console.error('CREATE FIRM ERROR:', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+/* =========================
+   ADMIN – APPROVE FIRM
+========================= */
+app.post('/admin/firms/:id/approve', requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('firms')
+      .update({ status: 'active' })
+      .eq('id', req.params.id)
+      .eq('status', 'pending')
+      .select()
+      .single()
+
+    if (error || !data)
+      return res.status(400).json({ error: 'Invalid state' })
+
+    res.json(data)
+  } catch (e) {
+    console.error('APPROVE FIRM ERROR:', e.message)
+    res.status(500).json({ error: e.message })
   }
 })
 
@@ -100,3 +134,4 @@ app.get('/admin/firms', requireAdmin, async (_, res) => {
 app.listen(PORT, () => {
   console.log('SERVER UP ON PORT', PORT)
 })
+
