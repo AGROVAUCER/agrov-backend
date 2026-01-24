@@ -1,7 +1,15 @@
 console.log('### AGROV BACKEND – FINAL LOCKED ###')
 
-import express from 'express'
+/* =========================
+   ENV
+========================= */
 import dotenv from 'dotenv'
+dotenv.config()
+
+/* =========================
+   IMPORTS
+========================= */
+import express from 'express'
 import cors from 'cors'
 import cron from 'node-cron'
 import PDFDocument from 'pdfkit'
@@ -10,14 +18,15 @@ import fs from 'fs'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 
-dotenv.config()
+import adminReportsTest from './routes/adminReportsTest.js'
+import { runMonthlyFirmReports } from './jobs/monthlyFirmReports.js'
 
+/* =========================
+   APP
+========================= */
 const app = express()
 const PORT = process.env.PORT || 10000
 
-/* =========================
-   CORS
-========================= */
 app.use(cors({ origin: '*', allowedHeaders: ['Content-Type', 'Authorization'] }))
 app.use(express.json())
 
@@ -45,6 +54,11 @@ const requireAdmin = async (req, res, next) => {
 }
 
 /* =========================
+   ROUTES
+========================= */
+app.use(adminReportsTest)
+
+/* =========================
    HEALTH
 ========================= */
 app.get('/health', (_, res) => res.json({ ok: true }))
@@ -59,6 +73,7 @@ app.post('/firms', async (req, res) => {
     .insert({ name, email, status: 'pending', active: false })
     .select()
     .single()
+
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
@@ -68,17 +83,20 @@ app.get('/admin/firms', requireAdmin, async (_, res) => {
     .from('firms')
     .select('*')
     .order('created_at', { ascending: false })
+
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
 
 app.post('/admin/firms/:id/approve', requireAdmin, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('firms')
     .update({ status: 'active', active: true })
     .eq('id', req.params.id)
     .select()
     .single()
+
+  if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
 
@@ -97,6 +115,7 @@ app.post('/firms/:id/stores', async (req, res) => {
     })
     .select()
     .single()
+
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
@@ -106,17 +125,20 @@ app.get('/firms/:id/stores', requireAdmin, async (req, res) => {
     .from('stores')
     .select('*')
     .eq('firm_id', req.params.id)
+
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
 
 app.post('/admin/stores/:id/approve', requireAdmin, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('stores')
     .update({ status: 'active', active: true })
     .eq('id', req.params.id)
     .select()
     .single()
+
+  if (error) return res.status(500).json({ error: error.message })
   res.json(data)
 })
 
@@ -151,10 +173,12 @@ app.post('/transactions', requireAdmin, async (req, res) => {
    BALANCE
 ========================= */
 app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('transactions')
     .select('amount, type')
     .eq('firm_id', req.params.id)
+
+  if (error) return res.status(500).json({ error: error.message })
 
   const balance = (data || []).reduce(
     (s, t) => s + (t.type === 'TAKE' ? t.amount : -t.amount),
@@ -165,9 +189,19 @@ app.get('/firms/:id/balance', requireAdmin, async (req, res) => {
 })
 
 /* =========================
-   PDF + CRON + HISTORY
+   CRON (MONTHLY)
 ========================= */
-/* (OVDE IDE TAČNO ISTI PDF / CRON KOD KOJI VEĆ IMAŠ – NIJE MENJAN) */
+if (process.env.RUN_MONTHLY_REPORTS === 'true') {
+  runMonthlyFirmReports()
+    .then(() => {
+      console.log('Monthly reports done')
+      process.exit(0)
+    })
+    .catch((err) => {
+      console.error(err)
+      process.exit(1)
+    })
+}
 
 /* =========================
    START
