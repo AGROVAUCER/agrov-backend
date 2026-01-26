@@ -1,6 +1,6 @@
 /**
  * AGROV BACKEND – ENTRY POINT
- * SCOPE: FIRMA PROFIL + ADMIN APPROVE
+ * SCOPE: FIRMA PROFIL + ADMIN APPROVE + STORES
  * STATUS: LOCKED
  */
 
@@ -11,6 +11,7 @@ import express from 'express'
 import cors from 'cors'
 
 import firmsRoutes from './src/routes/firms.routes.js'
+import storesRoutes from './src/routes/stores.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 10000
@@ -21,6 +22,7 @@ app.use(express.json())
 
 // ----------------- ROUTES -----------------
 app.use('/api', firmsRoutes)
+app.use('/api', storesRoutes)
 
 // ----------------- HEALTH -----------------
 app.get('/health', (_, res) => {

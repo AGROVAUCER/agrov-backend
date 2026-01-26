@@ -57,3 +57,46 @@ CREATE TRIGGER trigger_firms_updated_at
 BEFORE UPDATE ON firms
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+-- ================================
+-- STORES (PRODAVNICE)
+-- ================================
+
+-- 5. ENUM ZA STATUS PRODAVNICE
+CREATE TYPE store_status AS ENUM (
+  'pending',
+  'active',
+  'blocked'
+);
+
+-- 6. STORES TABELA
+CREATE TABLE stores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  firm_id UUID NOT NULL,
+
+  name TEXT NOT NULL,
+  address TEXT,
+
+  -- identifikacioni kod (za QR kasnije)
+  code TEXT UNIQUE,
+
+  status store_status NOT NULL DEFAULT 'pending',
+
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+
+  CONSTRAINT fk_store_firm
+    FOREIGN KEY (firm_id)
+    REFERENCES firms(id)
+    ON DELETE CASCADE
+);
+
+-- 7. INDEKSI
+CREATE INDEX idx_stores_firm_id ON stores(firm_id);
+CREATE INDEX idx_stores_status ON stores(status);
+
+-- 8. UPDATE TIMESTAMP TRIGGER
+CREATE TRIGGER trigger_stores_updated_at
+BEFORE UPDATE ON stores
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
