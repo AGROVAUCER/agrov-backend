@@ -10,7 +10,7 @@ dotenv.config()
 import express from 'express'
 import cors from 'cors'
 
-import firmsRoutes from '.src/routes/firms.routes.js'
+import firmsRoutes from './src/routes/firms.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 10000
