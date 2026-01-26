@@ -1,48 +1,44 @@
-import express from 'express';
-import { requireAdmin } from '../middleware/auth.js';
-import { generateFirmReportPDF } from '../services/pdfReportService.js';
-import { db } from '../db.js';
+import express from 'express'
+import dayjs from 'dayjs'
+import { createClient } from '@supabase/supabase-js'
+import { generateFirmReportPDF } from '../services/pdfReportService.js'
 
-const router = express.Router();
+const router = express.Router()
 
-router.get('/admin/reports/firm/:firmId/pdf', requireAdmin, async (req, res) => {
-  const { firmId } = req.params;
-  const { from, to } = req.query;
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-  if (!from || !to) {
-    return res.status(400).json({ error: 'from/to required' });
-  }
+router.get('/admin/reports/test/pdf', async (req, res) => {
+  const from = dayjs().startOf('month').toISOString()
+  const to = dayjs().endOf('month').toISOString()
 
-  const firm = await db.one(
-    'SELECT id, name FROM firms WHERE id = $1',
-    [firmId]
-  );
+  const { data: firm } = await supabase
+    .from('firms')
+    .select('id,name')
+    .eq('status', 'active')
+    .limit(1)
+    .single()
 
-  const transactions = await db.any(
-    `
-    SELECT type, amount, created_at, user_id
-    FROM transactions
-    WHERE firm_id = $1
-      AND created_at BETWEEN $2 AND $3
-    ORDER BY created_at ASC
-    `,
-    [firmId, from, to]
-  );
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('type,amount,created_at,user_id')
+    .eq('firm_id', firm.id)
+    .gte('created_at', from)
+    .lte('created_at', to)
+    .order('created_at')
 
-  const pdfBuffer = await generateFirmReportPDF({
+  const pdf = await generateFirmReportPDF({
     firm,
     transactions,
     from,
     to,
-  });
+  })
 
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="agrov-${firm.name}-${from}-${to}.pdf"`
-  );
+  res.setHeader('Content-Type', 'application/pdf')
+  res.send(pdf)
+})
 
-  res.send(pdfBuffer);
-});
+export default router
 
-export default router;
