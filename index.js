@@ -17,8 +17,6 @@ import nodemailer from 'nodemailer'
 import fs from 'fs'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
-
-import adminReportsTest from './routes/adminReportsTest.js'
 import { runMonthlyFirmReports } from './jobs/monthlyFirmReports.js'
 
 /* =========================
@@ -52,12 +50,6 @@ const requireAdmin = async (req, res, next) => {
 
   next()
 }
-
-/* =========================
-   ROUTES
-========================= */
-app.use(adminReportsTest)
-
 /* =========================
    HEALTH
 ========================= */
