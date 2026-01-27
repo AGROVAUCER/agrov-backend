@@ -1,7 +1,7 @@
 /**
  * ADMIN MANUAL TRANSACTIONS CONTROLLER
  * - Admin ručno dodeljuje / skida vaučere firmi
- * - Poziva adminTransactions.service
+ * - Admin vidi system transakcije
  */
 
 import {
@@ -10,9 +10,11 @@ import {
   listSystemTransactions
 } from '../services/adminTransactions.service.js';
 
+import { logAudit } from '../services/audit.service.js';
+
 /**
  * POST /admin/firms/:id/credit
- * Admin dodeljuje vaučere firmi
+ * system + TAKE
  */
 export async function adminCreditFirmController(req, res) {
   try {
@@ -20,6 +22,15 @@ export async function adminCreditFirmController(req, res) {
     const { amount, note } = req.body;
 
     const tx = await adminCreditFirm({ firmId, amount, note });
+
+    await logAudit({
+      actorRole: 'admin',
+      actorUserId: req.auth?.userId || null,
+      action: 'ADMIN_CREDIT',
+      targetType: 'firm',
+      targetId: firmId,
+      payload: { amount, note }
+    });
 
     return res.status(201).json({
       success: true,
@@ -35,7 +46,7 @@ export async function adminCreditFirmController(req, res) {
 
 /**
  * POST /admin/firms/:id/debit
- * Admin skida vaučere firmi
+ * system + GIVE
  */
 export async function adminDebitFirmController(req, res) {
   try {
@@ -43,6 +54,15 @@ export async function adminDebitFirmController(req, res) {
     const { amount, note } = req.body;
 
     const tx = await adminDebitFirm({ firmId, amount, note });
+
+    await logAudit({
+      actorRole: 'admin',
+      actorUserId: req.auth?.userId || null,
+      action: 'ADMIN_DEBIT',
+      targetType: 'firm',
+      targetId: firmId,
+      payload: { amount, note }
+    });
 
     return res.status(201).json({
       success: true,
@@ -58,7 +78,6 @@ export async function adminDebitFirmController(req, res) {
 
 /**
  * GET /admin/firms/:id/system-transactions
- * Admin vidi sve system transakcije firme
  */
 export async function listSystemTransactionsController(req, res) {
   try {
