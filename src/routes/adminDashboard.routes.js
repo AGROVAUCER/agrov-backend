@@ -1,0 +1,31 @@
+/**
+ * ADMIN DASHBOARD ROUTES
+ */
+
+import express from 'express';
+import { authMiddleware } from '../middleware/auth.js';
+import { requireRole } from '../middleware/requireRole.js';
+import {
+  listFirmsDashboardController,
+  getFirmDashboardController
+} from '../controllers/adminDashboard.controller.js';
+
+const router = express.Router();
+
+// lista firmi + balans
+router.get(
+  '/admin/dashboard/firms',
+  authMiddleware,
+  requireRole('admin'),
+  listFirmsDashboardController
+);
+
+// detalj firme
+router.get(
+  '/admin/dashboard/firms/:id',
+  authMiddleware,
+  requireRole('admin'),
+  getFirmDashboardController
+);
+
+export default router;
