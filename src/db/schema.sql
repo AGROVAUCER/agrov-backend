@@ -1,23 +1,21 @@
--- ================================
--- AGROV DATABASE SCHEMA
--- SCOPE: FIRMA PROFIL + ADMIN APPROVE
--- ================================
+-- ============================================
+-- AGROV DATABASE SCHEMA (FINAL / SAFE)
+-- ============================================
 
--- 1. ENUM ZA STATUS FIRME
-CREATE TYPE firm_status AS ENUM (
-  'pending',
-  'active',
-  'blocked'
-);
 
--- 2. FIRMS TABELA
-CREATE TABLE firms (
+-- ============================================
+-- 1. FIRMS
+-- ============================================
+
+DO $$ BEGIN
+  CREATE TYPE firm_status AS ENUM ('pending','active','blocked');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS firms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- veza ka auth.users (Supabase)
   user_id UUID NOT NULL UNIQUE,
 
-  -- osnovni podaci
   name TEXT NOT NULL,
   pib TEXT NOT NULL UNIQUE,
   registration_number TEXT NOT NULL UNIQUE,
@@ -27,12 +25,10 @@ CREATE TABLE firms (
   contact_phone TEXT,
   logo_url TEXT,
 
-  -- status
   status firm_status NOT NULL DEFAULT 'pending',
 
-  -- audit
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
 
   CONSTRAINT fk_firm_user
     FOREIGN KEY (user_id)
@@ -40,11 +36,93 @@ CREATE TABLE firms (
     ON DELETE CASCADE
 );
 
--- 3. INDEKSI
-CREATE INDEX idx_firms_user_id ON firms(user_id);
-CREATE INDEX idx_firms_status ON firms(status);
+CREATE INDEX IF NOT EXISTS idx_firms_user_id ON firms(user_id);
+CREATE INDEX IF NOT EXISTS idx_firms_status ON firms(status);
 
--- 4. UPDATE TIMESTAMP TRIGGER
+
+-- ============================================
+-- 2. STORES
+-- ============================================
+
+DO $$ BEGIN
+  CREATE TYPE store_status AS ENUM ('pending','active','blocked');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS stores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  firm_id UUID NOT NULL,
+
+  name TEXT NOT NULL,
+  address TEXT,
+  code TEXT UNIQUE,
+
+  status store_status NOT NULL DEFAULT 'pending',
+
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT fk_store_firm
+    FOREIGN KEY (firm_id)
+    REFERENCES firms(id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_stores_firm_id ON stores(firm_id);
+CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(status);
+
+
+-- ============================================
+-- 3. TRANSACTIONS
+-- ============================================
+
+DO $$ BEGIN
+  CREATE TYPE transaction_type AS ENUM ('GIVE','TAKE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE transaction_source AS ENUM ('system','operational');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  firm_id UUID NOT NULL,
+  store_id UUID,
+  user_id UUID,
+
+  type transaction_type NOT NULL,
+  source transaction_source NOT NULL DEFAULT 'operational',
+
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+
+  created_at TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT fk_tx_firm
+    FOREIGN KEY (firm_id)
+    REFERENCES firms(id)
+    ON DELETE CASCADE,
+
+  CONSTRAINT fk_tx_store
+    FOREIGN KEY (store_id)
+    REFERENCES stores(id)
+    ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tx_firm_id ON transactions(firm_id);
+CREATE INDEX IF NOT EXISTS idx_tx_store_id ON transactions(store_id);
+CREATE INDEX IF NOT EXISTS idx_tx_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_tx_source ON transactions(source);
+CREATE INDEX IF NOT EXISTS idx_tx_created_at ON transactions(created_at);
+
+
+-- ============================================
+-- 4. UPDATED_AT TRIGGER (SHARED)
+-- ============================================
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -53,49 +131,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_firms_updated_at ON firms;
 CREATE TRIGGER trigger_firms_updated_at
 BEFORE UPDATE ON firms
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
--- ================================
--- STORES (PRODAVNICE)
--- ================================
 
--- 5. ENUM ZA STATUS PRODAVNICE
-CREATE TYPE store_status AS ENUM (
-  'pending',
-  'active',
-  'blocked'
-);
-
--- 6. STORES TABELA
-CREATE TABLE stores (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  firm_id UUID NOT NULL,
-
-  name TEXT NOT NULL,
-  address TEXT,
-
-  -- identifikacioni kod (za QR kasnije)
-  code TEXT UNIQUE,
-
-  status store_status NOT NULL DEFAULT 'pending',
-
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-
-  CONSTRAINT fk_store_firm
-    FOREIGN KEY (firm_id)
-    REFERENCES firms(id)
-    ON DELETE CASCADE
-);
-
--- 7. INDEKSI
-CREATE INDEX idx_stores_firm_id ON stores(firm_id);
-CREATE INDEX idx_stores_status ON stores(status);
-
--- 8. UPDATE TIMESTAMP TRIGGER
+DROP TRIGGER IF EXISTS trigger_stores_updated_at ON stores;
 CREATE TRIGGER trigger_stores_updated_at
 BEFORE UPDATE ON stores
 FOR EACH ROW
