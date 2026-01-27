@@ -15,6 +15,7 @@ import adminTransactionsRoutes from './src/routes/adminTransactions.routes.js'
 import balanceRoutes from './src/routes/balance.routes.js'
 import transactionsRoutes from './src/routes/transactions.routes.js';
 import monthlySummaryRoutes from './src/routes/monthlySummary.routes.js';
+import pdfReportRoutes from './src/routes/pdfReport.routes.js';
 const app = express()
 const PORT = process.env.PORT || 10000
 
@@ -29,6 +30,7 @@ app.use('/api', adminTransactionsRoutes)
 app.use('/api', balanceRoutes)
 app.use('/api', transactionsRoutes);
 app.use('/api', monthlySummaryRoutes);
+app.use('/api', pdfReportRoutes);
 // ----------------- HEALTH -----------------
 app.get('/health', (_, res) => {
   res.status(200).json({ status: 'ok' })
