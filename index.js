@@ -19,6 +19,7 @@ import pdfReportRoutes from './src/routes/pdfReport.routes.js';
 import './src/jobs/monthlyEmail.job.js';
 import adminDashboardRoutes from './src/routes/adminDashboard.routes.js';
 import exportRoutes from './src/routes/export.routes.js';
+import agrovPointsRoutes from './src/routes/agrovPoints.routes.js';
 
 const app = express()
 const PORT = process.env.PORT || 10000
@@ -37,6 +38,7 @@ app.use('/api', monthlySummaryRoutes);
 app.use('/api', pdfReportRoutes);
 app.use('/api', adminDashboardRoutes);
 app.use('/api', exportRoutes);
+app.use('/api', agrovPointsRoutes);
 // ----------------- HEALTH -----------------
 app.get('/health', (_, res) => {
   res.status(200).json({ status: 'ok' })
