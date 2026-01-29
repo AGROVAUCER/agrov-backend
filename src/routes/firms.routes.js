@@ -1,8 +1,3 @@
-/**
- * AGROV FIRMS ROUTES
- * - Firma: kreira i čita svoj profil
- * - Admin: odobrava firmu
- */
 
 import express from 'express';
 
@@ -12,7 +7,8 @@ import { requireRole } from '../middleware/requireRole.js';
 import {
   createFirmProfileController,
   getMyFirmController,
-  approveFirmController
+  approveFirmController,
+  listAllFirmsController
 } from '../controllers/firms.controller.js';
 
 const router = express.Router();
@@ -48,6 +44,17 @@ router.post(
   authMiddleware,
   requireRole('admin'),
   approveFirmController
+);
+
+/**
+ * Admin – list svih firmi (read-only)
+ * GET /admin/firms
+ */
+router.get(
+  '/admin/firms',
+  authMiddleware,
+  requireRole('admin'),
+  listAllFirmsController
 );
 
 export default router;

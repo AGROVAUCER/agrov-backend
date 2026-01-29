@@ -4,6 +4,7 @@
  * - Kreiranje profila firme (firm user)
  * - Čitanje sopstvenog profila
  * - Admin approve firme (pending -> active)
+ * - Admin list svih firmi (read-only)
  *
  * PRAVILA (KANON):
  * - Jedan auth user = jedna firma
@@ -134,3 +135,28 @@ export async function approveFirm(firmId) {
 
   return updatedFirm;
 }
+
+/**
+ * Admin – list svih firmi (read-only)
+ */
+export async function listAllFirms() {
+  const { data, error } = await supabase
+    .from('firms')
+    .select(`
+      id,
+      name,
+      status,
+      stores_count,
+      balance,
+      vouchers_issued,
+      created_at
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+

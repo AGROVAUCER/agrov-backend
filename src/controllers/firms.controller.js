@@ -8,7 +8,8 @@
 import {
   createFirmProfile,
   getMyFirm,
-  approveFirm
+  approveFirm,
+  listAllFirms
 } from '../services/firms.service.js';
 
 /**
@@ -74,6 +75,26 @@ export async function approveFirmController(req, res) {
     });
   } catch (err) {
     return res.status(400).json({
+      success: false,
+      error: err.message
+    });
+  }
+}
+
+/**
+ * GET /admin/firms
+ * Admin – list svih firmi (read-only)
+ */
+export async function listAllFirmsController(req, res) {
+  try {
+    const firms = await listAllFirms();
+
+    return res.status(200).json({
+      success: true,
+      data: firms
+    });
+  } catch (err) {
+    return res.status(500).json({
       success: false,
       error: err.message
     });
