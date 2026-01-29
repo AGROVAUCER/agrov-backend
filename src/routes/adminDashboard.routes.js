@@ -2,15 +2,21 @@
  * ADMIN DASHBOARD ROUTES
  */
 
-import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import express from 'express'
+import cors from 'cors'
+import { authMiddleware } from '../middleware/auth.js'
+import { requireRole } from '../middleware/requireRole.js'
 import {
   listFirmsDashboardController,
   getFirmDashboardController
-} from '../controllers/adminDashboard.controller.js';
+} from '../controllers/adminDashboard.controller.js'
 
-const router = express.Router();
+const router = express.Router()
+
+// --------------------------------------------------
+// CORS PREFLIGHT (KRITIČNO – mora pre auth middleware)
+// --------------------------------------------------
+router.options('*', cors())
 
 // lista firmi + balans
 router.get(
@@ -18,7 +24,7 @@ router.get(
   authMiddleware,
   requireRole('admin'),
   listFirmsDashboardController
-);
+)
 
 // detalj firme
 router.get(
@@ -26,6 +32,7 @@ router.get(
   authMiddleware,
   requireRole('admin'),
   getFirmDashboardController
-);
+)
 
-export default router;
+export default router
+
