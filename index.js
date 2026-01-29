@@ -18,18 +18,20 @@ import agrovPointsRoutes from './src/routes/agrovPoints.routes.js'
 const app = express()
 const PORT = process.env.PORT || 10000
 
-// ================= CORS – FINAL =================
+// ================= CORS – FINAL (FIXED) =================
 app.use(cors({
   origin: [
-    'http://localhost:5173',
+    'http://localhost:3000',      // ✅ Next.js admin (local)
+    'http://localhost:5173',      // (ako ti još negde treba)
     'https://agrov-admin.vercel.app'
   ],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 
 app.options('*', cors())
-// ===============================================
+// =======================================================
 
 app.use(express.json())
 
