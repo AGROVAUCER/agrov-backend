@@ -13,6 +13,13 @@ const supabase = createClient(
 );
 
 export async function authMiddleware(req, res, next) {
+  // -------------------------------------------------
+  // CORS PREFLIGHT — MORA PROĆI BEZ AUTH PROVERE
+  // -------------------------------------------------
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   try {
     const authHeader = req.headers.authorization;
 
