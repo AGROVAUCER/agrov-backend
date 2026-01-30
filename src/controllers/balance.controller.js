@@ -5,7 +5,7 @@
  * - Admin vidi sistemsko stanje (dashboard)
  */
 
-import { getFirmBalance, getSystemBalance } from '../services/balance.service.js'
+import { getFirmBalance } from '../services/balance.service.js'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -52,6 +52,7 @@ export async function getMyBalanceController(req, res) {
 export async function getFirmBalanceAdminController(req, res) {
   try {
     const { id: firmId } = req.params
+
     const balance = await getFirmBalance(firmId)
 
     return res.status(200).json({
@@ -67,35 +68,31 @@ export async function getFirmBalanceAdminController(req, res) {
 }
 
 /**
- * ✅ GET /balance
+ * GET /balance
  * Admin – SISTEMSKO STANJE (dashboard)
  */
 export async function getSystemBalanceAdminController(req, res) {
   try {
-    // ako već imaš logiku u servisu, koristi je
-    if (typeof getSystemBalance === 'function') {
-      const balance = await getSystemBalance()
-      return res.status(200).json({
-        success: true,
-        data: balance,
-      })
-    }
-
-    // fallback: zbir svih firmi (KANONSKI MINIMUM)
-    const { data, error } = await supabase
+    const { data: firms, error } = await supabase
       .from('firms')
       .select('id')
 
-    if (error) throw error
+    if (error) {
+      throw error
+    }
 
     let total = 0
-    for (const firm of data) {
-      total += await getFirmBalance(firm.id)
+
+    for (const firm of firms) {
+      const balance = await getFirmBalance(firm.id)
+      total += balance
     }
 
     return res.status(200).json({
       success: true,
-      data: { system_balance: total },
+      data: {
+        system_balance: total,
+      },
     })
   } catch (err) {
     return res.status(500).json({
