@@ -45,6 +45,7 @@ app.use('/api', pdfReportRoutes)
 app.use('/api', adminDashboardRoutes)
 app.use('/api', exportRoutes)
 app.use('/api', agrovPointsRoutes)
+app.use('/exports', express.static('exports'))
 
 app.get('/health', (_, res) => {
   res.json({ status: 'ok' })
