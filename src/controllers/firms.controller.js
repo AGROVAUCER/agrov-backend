@@ -1,103 +1,17 @@
 /**
- * AGROV FIRMS CONTROLLER
- * - Prima HTTP zahteve
- * - Poziva firms.service
- * - Vraća standardizovan JSON response
+ * GET /api/admin/firms
+ * Admin – list svih firmi
+ * CONTRACT: { data: Firm[] }
  */
 
-import {
-  createFirmProfile,
-  getMyFirm,
-  approveFirm,
-  listAllFirms
-} from '../services/firms.service.js';
+import { listAllFirms } from '../services/firms.service.js';
 
-/**
- * POST /firms/profile
- * Firma kreira svoj profil
- */
-export async function createFirmProfileController(req, res) {
-  try {
-    const { userId } = req.auth;
-
-    const firm = await createFirmProfile({
-      userId,
-      payload: req.body
-    });
-
-    return res.status(201).json({
-      success: true,
-      firm
-    });
-  } catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
-  }
-}
-
-/**
- * GET /firms/me
- * Firma čita svoj profil
- */
-export async function getMyFirmController(req, res) {
-  try {
-    const { userId } = req.auth;
-
-    const firm = await getMyFirm(userId);
-
-    return res.status(200).json({
-      success: true,
-      firm
-    });
-  } catch (err) {
-    return res.status(404).json({
-      success: false,
-      error: err.message
-    });
-  }
-}
-
-/**
- * POST /admin/firms/:id/approve
- * Admin odobrava firmu
- */
-export async function approveFirmController(req, res) {
-  try {
-    const { id } = req.params;
-
-    const firm = await approveFirm(id);
-
-    return res.status(200).json({
-      success: true,
-      firm
-    });
-  } catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
-  }
-}
-
-/**
- * GET /admin/firms
- * Admin – list svih firmi (read-only)
- */
 export async function listAllFirmsController(req, res) {
   try {
     const firms = await listAllFirms();
-
-  return res.status(200).json({
-  success: true,
-  data: firms
-});
-
+    return res.status(200).json({ data: firms });
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error('listAllFirmsController error:', err);
+    return res.status(500).json({ error: 'Failed to load firms' });
   }
 }
