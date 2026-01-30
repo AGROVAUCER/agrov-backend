@@ -89,10 +89,11 @@ export async function listAllFirmsController(req, res) {
   try {
     const firms = await listAllFirms();
 
-    return res.status(200).json({
-      success: true,
-      data: firms
-    });
+  return res.status(200).json({
+  success: true,
+  data: firms
+});
+
   } catch (err) {
     return res.status(500).json({
       success: false,
