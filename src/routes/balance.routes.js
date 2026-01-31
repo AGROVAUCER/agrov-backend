@@ -1,27 +1,52 @@
-import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
+/**
+ * BALANCE ROUTES
+ * - Firma: svoje stanje
+ * - Admin: stanje firme
+ * - Admin: SYSTEM balance (dashboard)
+ */
+
+import express from 'express'
+import { authMiddleware } from '../middleware/auth.js'
+import { requireRole } from '../middleware/requireRole.js'
 import {
   getMyBalanceController,
-  getFirmBalanceAdminController
-} from '../controllers/balance.controller.js';
+  getFirmBalanceAdminController,
+  getSystemBalanceAdminController
+} from '../controllers/balance.controller.js'
 
-const router = express.Router();
+const router = express.Router()
 
-// firma
+/**
+ * Firma – svoje stanje
+ * GET /balance/me
+ */
 router.get(
   '/balance/me',
   authMiddleware,
   requireRole('firm'),
   getMyBalanceController
-);
+)
 
-// admin
+/**
+ * Admin – stanje pojedinačne firme
+ * GET /admin/firms/:id/balance
+ */
 router.get(
   '/admin/firms/:id/balance',
   authMiddleware,
   requireRole('admin'),
   getFirmBalanceAdminController
-);
+)
 
-export default router;
+/**
+ * Admin – SYSTEM BALANCE (dashboard)
+ * GET /balance
+ */
+router.get(
+  '/balance',
+  authMiddleware,
+  requireRole('admin'),
+  getSystemBalanceAdminController
+)
+
+export default router
