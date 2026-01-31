@@ -1,8 +1,8 @@
 /**
- * ADMIN MANUAL TRANSACTIONS SERVICE
- * - Admin ručno dodeljuje / skida vaučere firmi
- * - source = system
- * - vidi i upravlja samo admin
+ * ADMIN TRANSACTIONS SERVICE (KANONSKI)
+ * - Ručne admin transakcije (credit / debit)
+ * - System transakcije
+ * - Globalni admin read svih transakcija
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -14,14 +14,13 @@ const supabase = createClient(
 
 /**
  * ADMIN CREDIT
- * system + TAKE  -> firma dobija vaučere
+ * system + TAKE -> firma dobija vaučere
  */
 export async function adminCreditFirm({ firmId, amount, note }) {
   if (!firmId || !amount || Number(amount) <= 0) {
     throw new Error('Invalid credit payload');
   }
 
-  // firma mora postojati
   const { data: firm, error: firmError } = await supabase
     .from('firms')
     .select('id')
@@ -32,7 +31,6 @@ export async function adminCreditFirm({ firmId, amount, note }) {
     throw new Error('Firm not found');
   }
 
-  // insert system transaction
   const { data: tx, error } = await supabase
     .from('transactions')
     .insert([
@@ -41,8 +39,6 @@ export async function adminCreditFirm({ firmId, amount, note }) {
         type: 'TAKE',
         source: 'system',
         amount
-        // store_id = NULL
-        // user_id = NULL
       }
     ])
     .select()
@@ -57,14 +53,13 @@ export async function adminCreditFirm({ firmId, amount, note }) {
 
 /**
  * ADMIN DEBIT
- * system + GIVE -> skidanje / korekcija
+ * system + GIVE -> skidanje vaučera
  */
 export async function adminDebitFirm({ firmId, amount, note }) {
   if (!firmId || !amount || Number(amount) <= 0) {
     throw new Error('Invalid debit payload');
   }
 
-  // firma mora postojati
   const { data: firm, error: firmError } = await supabase
     .from('firms')
     .select('id')
@@ -96,7 +91,8 @@ export async function adminDebitFirm({ firmId, amount, note }) {
 }
 
 /**
- * ADMIN VIEW – sve system transakcije firme
+ * ADMIN VIEW
+ * Sve system transakcije za jednu firmu
  */
 export async function listSystemTransactions(firmId) {
   const { data, error } = await supabase
@@ -112,3 +108,37 @@ export async function listSystemTransactions(firmId) {
 
   return data;
 }
+
+/**
+ * ADMIN GLOBAL VIEW (KANONSKI)
+ * Sve transakcije u sistemu (za admin UI)
+ */
+export async function listAllAdminTransactions() {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(`
+      id,
+      type,
+      amount,
+      created_at,
+      firm_id,
+      firms (
+        name
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.map(tx => ({
+    id: tx.id,
+    firm_id: tx.firm_id,
+    firm_name: tx.firms?.name || '—',
+    type: tx.type,
+    amount: tx.amount,
+    created_at: tx.created_at
+  }));
+}
+

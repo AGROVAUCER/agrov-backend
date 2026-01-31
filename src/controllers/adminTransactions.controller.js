@@ -1,20 +1,18 @@
 /**
- * ADMIN MANUAL TRANSACTIONS CONTROLLER
- * - Admin ručno dodeljuje / skida vaučere firmi
- * - Admin vidi system transakcije
+ * ADMIN TRANSACTIONS CONTROLLER (KANONSKI)
  */
 
 import {
   adminCreditFirm,
   adminDebitFirm,
-  listSystemTransactions
+  listSystemTransactions,
+  listAllAdminTransactions
 } from '../services/adminTransactions.service.js';
 
 import { logAudit } from '../services/audit.service.js';
 
 /**
  * POST /admin/firms/:id/credit
- * system + TAKE
  */
 export async function adminCreditFirmController(req, res) {
   try {
@@ -46,7 +44,6 @@ export async function adminCreditFirmController(req, res) {
 
 /**
  * POST /admin/firms/:id/debit
- * system + GIVE
  */
 export async function adminDebitFirmController(req, res) {
   try {
@@ -82,7 +79,6 @@ export async function adminDebitFirmController(req, res) {
 export async function listSystemTransactionsController(req, res) {
   try {
     const { id: firmId } = req.params;
-
     const transactions = await listSystemTransactions(firmId);
 
     return res.status(200).json({
@@ -92,6 +88,24 @@ export async function listSystemTransactionsController(req, res) {
   } catch (err) {
     return res.status(400).json({
       success: false,
+      error: err.message
+    });
+  }
+}
+
+/**
+ * GET /admin/transactions
+ * KANONSKI admin read
+ */
+export async function listAllAdminTransactionsController(req, res) {
+  try {
+    const transactions = await listAllAdminTransactions();
+
+    return res.status(200).json({
+      data: transactions
+    });
+  } catch (err) {
+    return res.status(400).json({
       error: err.message
     });
   }

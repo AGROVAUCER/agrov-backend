@@ -1,7 +1,5 @@
 /**
- * ADMIN MANUAL TRANSACTIONS ROUTES
- * - Samo admin
- * - Ručna dodela / skidanje vaučera
+ * ADMIN TRANSACTIONS ROUTES (KANONSKI)
  */
 
 import express from 'express';
@@ -12,13 +10,13 @@ import { requireRole } from '../middleware/requireRole.js';
 import {
   adminCreditFirmController,
   adminDebitFirmController,
-  listSystemTransactionsController
+  listSystemTransactionsController,
+  listAllAdminTransactionsController
 } from '../controllers/adminTransactions.controller.js';
 
 const router = express.Router();
 
 /**
- * Admin – dodela vaučera firmi
  * POST /admin/firms/:id/credit
  */
 router.post(
@@ -29,7 +27,6 @@ router.post(
 );
 
 /**
- * Admin – skidanje vaučera firmi
  * POST /admin/firms/:id/debit
  */
 router.post(
@@ -40,7 +37,6 @@ router.post(
 );
 
 /**
- * Admin – pregled system transakcija firme
  * GET /admin/firms/:id/system-transactions
  */
 router.get(
@@ -48,6 +44,17 @@ router.get(
   authMiddleware,
   requireRole('admin'),
   listSystemTransactionsController
+);
+
+/**
+ * GET /admin/transactions
+ * KANONSKI
+ */
+router.get(
+  '/admin/transactions',
+  authMiddleware,
+  requireRole('admin'),
+  listAllAdminTransactionsController
 );
 
 export default router;
