@@ -1,19 +1,33 @@
-/**
- * PDF REPORT ROUTES (ADMIN)
- */
+import express from 'express'
+import { authMiddleware } from '../middleware/auth.js'
+import { requireRole } from '../middleware/requireRole.js'
+import {
+  listReportsController,
+  generateMonthlyReportController,
+  downloadReportController
+} from '../controllers/pdfReport.controller.js'
 
-import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { requireRole } from '../middleware/requireRole.js';
-import { generateMonthlyPdfController } from '../controllers/pdfReport.controller.js';
-
-const router = express.Router();
+const router = express.Router()
 
 router.get(
-  '/admin/firms/:id/report/:year/:month',
+  '/admin/reports',
   authMiddleware,
   requireRole('admin'),
-  generateMonthlyPdfController
-);
+  listReportsController
+)
 
-export default router;
+router.post(
+  '/admin/firms/:id/reports/:year/:month',
+  authMiddleware,
+  requireRole('admin'),
+  generateMonthlyReportController
+)
+
+router.get(
+  '/admin/reports/:reportId/pdf',
+  authMiddleware,
+  requireRole('admin'),
+  downloadReportController
+)
+
+export default router

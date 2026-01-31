@@ -1,36 +1,22 @@
-/**
- * PDF REPORT CONTROLLER (ADMIN)
- */
+import {
+  generateMonthlyReport,
+  listReports,
+  getReportDownload
+} from '../services/pdfReport.service.js'
 
-import { generateMonthlyPdf } from '../services/pdfReport.service.js';
-import { createClient } from '@supabase/supabase-js';
+export async function listReportsController(req, res) {
+  const data = await listReports()
+  res.json({ data })
+}
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export async function generateMonthlyReportController(req, res) {
+  const { id, year, month } = req.params
+  const report = await generateMonthlyReport({ firmId: id, year, month })
+  res.json({ success: true, report })
+}
 
-export async function generateMonthlyPdfController(req, res) {
-  try {
-    const { id: firmId, year, month } = req.params;
-
-    const { data: firm } = await supabase
-      .from('firms')
-      .select('name')
-      .eq('id', firmId)
-      .single();
-
-    if (!firm) throw new Error('Firm not found');
-
-    const { filePath, fileName } = await generateMonthlyPdf({
-      firmId,
-      firmName: firm.name,
-      year,
-      month
-    });
-
-    res.download(filePath, fileName);
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
+export async function downloadReportController(req, res) {
+  const { reportId } = req.params
+  const result = await getReportDownload(reportId)
+  res.json(result)
 }
