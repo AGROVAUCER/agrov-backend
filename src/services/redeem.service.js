@@ -1,6 +1,5 @@
-// src/services/redeem.service.js
-
 import { createClient } from '@supabase/supabase-js';
+import { getMaxSystemPercent } from './systemSettings.service.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -10,14 +9,17 @@ const supabase = createClient(
 export async function redeemPoints({
   user_id,
   store_id,
-  bill_amount,
-  max_system_percent // npr 30
+  bill_amount
 }) {
   if (!user_id || !store_id || !bill_amount) {
     throw new Error('Missing redeem fields');
   }
 
-  const maxSystem = Math.floor(Number(bill_amount) * (max_system_percent / 100));
+  const max_system_percent = await getMaxSystemPercent();
+
+  const maxSystemAllowed = Math.floor(
+    Number(bill_amount) * (max_system_percent / 100)
+  );
 
   const { data: userRows, error: userErr } = await supabase
     .from('points_ledger')
@@ -30,61 +32,65 @@ export async function redeemPoints({
 
   const userBalance = userRows.reduce((s, r) => s + r.amount, 0);
 
-  const { data: systemRows, error: sysErr } = await supabase
+  const { data: systemRows, error: systemErr } = await supabase
     .from('points_ledger')
     .select('amount')
     .eq('type', 'system')
     .eq('store_id', store_id);
 
-  if (sysErr) throw new Error(sysErr.message);
+  if (systemErr) throw new Error(systemErr.message);
 
   const systemBalance = systemRows.reduce((s, r) => s + r.amount, 0);
 
-  const systemAllowed = Math.min(systemBalance, maxSystem);
+  const usableSystem = Math.min(systemBalance, maxSystemAllowed);
 
-  const discount = Math.min(
-    userBalance + systemAllowed,
-    Math.floor(bill_amount)
+  const totalDiscount = Math.min(
+    userBalance + usableSystem,
+    Math.floor(Number(bill_amount))
   );
 
-  const rows = [];
-
-  if (discount <= 0) {
-    return { discount: 0 };
+  if (totalDiscount <= 0) {
+    return {
+      discount: 0,
+      used_user: 0,
+      used_system: 0
+    };
   }
 
-  const useUser = Math.min(userBalance, discount);
-  const useSystem = discount - useUser;
+  const usedUser = Math.min(userBalance, totalDiscount);
+  const usedSystem = totalDiscount - usedUser;
 
-  if (useUser > 0) {
-    rows.push({
+  const inserts = [];
+
+  if (usedUser > 0) {
+    inserts.push({
       type: 'user',
       owner_user_id: user_id,
       store_id,
-      amount: -useUser,
+      amount: -usedUser,
       source: 'redeem'
     });
   }
 
-  if (useSystem > 0) {
-    rows.push({
+  if (usedSystem > 0) {
+    inserts.push({
       type: 'system',
       owner_user_id: null,
       store_id,
-      amount: -useSystem,
+      amount: -usedSystem,
       source: 'redeem'
     });
   }
 
-  const { error } = await supabase
+  const { error: insertErr } = await supabase
     .from('points_ledger')
-    .insert(rows);
+    .insert(inserts);
 
-  if (error) throw new Error(error.message);
+  if (insertErr) throw new Error(insertErr.message);
 
   return {
-    discount,
-    used_user: useUser,
-    used_system: useSystem
+    discount: totalDiscount,
+    used_user: usedUser,
+    used_system: usedSystem
   };
 }
