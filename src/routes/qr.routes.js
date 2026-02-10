@@ -1,7 +1,7 @@
 // src/routes/qr.routes.js
 
 import express from 'express';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { claimQr } from '../controllers/qr.controller.js';
 
 const router = express.Router();
