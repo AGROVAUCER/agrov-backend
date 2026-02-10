@@ -14,8 +14,8 @@ import pdfReportRoutes from './src/routes/pdfReport.routes.js'
 import adminDashboardRoutes from './src/routes/adminDashboard.routes.js'
 import exportRoutes from './src/routes/export.routes.js'
 import agrovPointsRoutes from './src/routes/agrovPoints.routes.js'
-import redeemRoutes from './routes/redeem.routes.js'
-import pointsRoutes from './routes/points.routes.js'
+import redeemRoutes from './src/routes/redeem.routes.js'
+import pointsRoutes from './src/routes/points.routes.js'
 
 
 const app = express()
