@@ -14,6 +14,9 @@ import pdfReportRoutes from './src/routes/pdfReport.routes.js'
 import adminDashboardRoutes from './src/routes/adminDashboard.routes.js'
 import exportRoutes from './src/routes/export.routes.js'
 import agrovPointsRoutes from './src/routes/agrovPoints.routes.js'
+import redeemRoutes from './routes/redeem.routes.js'
+import pointsRoutes from './routes/points.routes.js'
+
 
 const app = express()
 const PORT = process.env.PORT || 10000
@@ -46,6 +49,12 @@ app.use('/api', adminDashboardRoutes)
 app.use('/api', exportRoutes)
 app.use('/api', agrovPointsRoutes)
 app.use('/exports', express.static('exports'))
+app.use('/api/points', redeemRoutes)
+app.use('/api/points', pointsRoutes)
+
+
+
+
 
 app.get('/health', (_, res) => {
   res.json({ status: 'ok' })

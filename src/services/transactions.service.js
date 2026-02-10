@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { createCashback } from './points.service.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -52,8 +53,8 @@ export async function createOperationalTransaction({
     throw new Error('Store not in firm');
   }
 
-  // insert
-  const { data, error } = await supabase
+  // insert transaction
+  const { data: tx, error } = await supabase
     .from('transactions')
     .insert([{
       firm_id: firm.id,
@@ -68,5 +69,16 @@ export async function createOperationalTransaction({
 
   if (error) throw new Error(error.message);
 
-  return data;
+  // cashback (samo za kupovinu)
+  if (type === 'TAKE') {
+    await createCashback({
+      user_id,
+      store_id,
+      amount,
+      transaction_id: tx.id
+    });
+  }
+
+  return tx;
 }
+
