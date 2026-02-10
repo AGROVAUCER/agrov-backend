@@ -18,6 +18,7 @@ import exportRoutes from './routes/export.routes.js';
 import agrovPointsRoutes from './routes/agrovPoints.routes.js';
 import redeemRoutes from './routes/redeem.routes.js';
 import pointsRoutes from './routes/points.routes.js';
+import systemSettingsRoutes from './routes/systemSettings.routes.js'
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -52,6 +53,7 @@ app.use('/api', pdfReportRoutes);
 app.use('/api', adminDashboardRoutes);
 app.use('/api', exportRoutes);
 app.use('/api', agrovPointsRoutes);
+app.use('/api/admin', systemSettingsRoutes);
 
 app.use('/api/points', redeemRoutes);
 app.use('/api/points', pointsRoutes);
