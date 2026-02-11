@@ -10,17 +10,27 @@ const supabase = createClient(
  */
 export async function getDashboardStatsController(req, res) {
   try {
-    const { count: totalFirms } = await supabase
+    // FIRMS COUNT
+    const { count: totalFirms, error: firmError } = await supabase
       .from('firms')
       .select('*', { count: 'exact', head: true })
 
-    const { count: totalUsers } = await supabase
-      .from('auth.users')
-      .select('*', { count: 'exact', head: true })
+    if (firmError) throw firmError
 
-    const { data: transactions } = await supabase
+    // USERS COUNT (ADMIN API)
+    const { data: usersData, error: usersError } =
+      await supabase.auth.admin.listUsers()
+
+    if (usersError) throw usersError
+
+    const totalUsers = usersData?.users?.length || 0
+
+    // TRANSACTIONS
+    const { data: transactions, error: txError } = await supabase
       .from('transactions')
       .select('amount, type')
+
+    if (txError) throw txError
 
     const systemBalance = (transactions || []).reduce((sum, t) => {
       return t.type === 'GIVE'
@@ -30,9 +40,9 @@ export async function getDashboardStatsController(req, res) {
 
     return res.json({
       total_firms: totalFirms || 0,
-      total_users: totalUsers || 0,
+      total_users: totalUsers,
       total_transactions: transactions?.length || 0,
-      system_balance: systemBalance,
+      system_balance: systemBalance
     })
   } catch (err) {
     return res.status(500).json({ error: err.message })
@@ -76,6 +86,10 @@ export async function getFirmDashboardController(req, res) {
     return res.status(500).json({ error: err.message })
   }
 }
+
+/**
+ * LIST USERS
+ */
 export async function listUsersController(req, res) {
   try {
     const { data, error } = await supabase.auth.admin.listUsers()
