@@ -23,5 +23,18 @@ router.put(
   requireRole('admin'),
   toggleUserBlockController
 )
+router.get(
+  '/admin/app-users',
+  authMiddleware,
+  requireRole('admin'),
+  listAppUsersController
+)
+
+router.patch(
+  '/admin/app-users/:id/toggle',
+  authMiddleware,
+  requireRole('admin'),
+  toggleAppUserStatusController
+)
 
 export default router
