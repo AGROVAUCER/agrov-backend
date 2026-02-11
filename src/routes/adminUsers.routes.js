@@ -3,7 +3,9 @@ import { authMiddleware } from '../middleware/auth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   changeFirmStatusController,
-  toggleUserBlockController
+  toggleUserBlockController,
+  listAppUsersController,
+  toggleAppUserStatusController
 } from '../controllers/adminUsers.controller.js'
 
 const router = express.Router()
@@ -16,13 +18,15 @@ router.put(
   changeFirmStatusController
 )
 
-// BLOCK / UNBLOCK USER
+// BLOCK / UNBLOCK ADMIN USER
 router.put(
   '/admin/users/:id/block',
   authMiddleware,
   requireRole('admin'),
   toggleUserBlockController
 )
+
+// LIST MOBILE APP USERS
 router.get(
   '/admin/app-users',
   authMiddleware,
@@ -30,6 +34,7 @@ router.get(
   listAppUsersController
 )
 
+// TOGGLE MOBILE USER STATUS
 router.patch(
   '/admin/app-users/:id/toggle',
   authMiddleware,
