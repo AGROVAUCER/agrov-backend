@@ -8,17 +8,24 @@ import { authMiddleware } from '../middleware/auth.js'
 import { requireRole } from '../middleware/requireRole.js'
 import {
   listFirmsDashboardController,
-  getFirmDashboardController
+  getFirmDashboardController,
+  getDashboardStatsController
 } from '../controllers/adminDashboard.controller.js'
 
 const router = express.Router()
 
-// --------------------------------------------------
-// CORS PREFLIGHT (KRITIČNO – mora pre auth middleware)
-// --------------------------------------------------
+// CORS PREFLIGHT
 router.options('*', cors())
 
-// lista firmi + balans
+// DASHBOARD STATS
+router.get(
+  '/admin/dashboard/stats',
+  authMiddleware,
+  requireRole('admin'),
+  getDashboardStatsController
+)
+
+// LISTA FIRMI
 router.get(
   '/admin/dashboard/firms',
   authMiddleware,
@@ -26,7 +33,7 @@ router.get(
   listFirmsDashboardController
 )
 
-// detalj firme
+// DETALJ FIRME
 router.get(
   '/admin/dashboard/firms/:id',
   authMiddleware,
@@ -35,4 +42,5 @@ router.get(
 )
 
 export default router
+
 
