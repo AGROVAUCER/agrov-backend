@@ -1,5 +1,3 @@
-// src/routes/redeem.routes.js
-
 import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireRole } from '../middleware/requireRole.js';
@@ -15,4 +13,3 @@ router.post(
 );
 
 export default router;
-

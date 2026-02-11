@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { getMaxSystemPercent } from './systemSettings.service.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -7,90 +6,85 @@ const supabase = createClient(
 );
 
 export async function redeemPoints({
-  user_id,
+  firmUserId,
   store_id,
-  bill_amount
+  user_id,
+  amount,
 }) {
-  if (!user_id || !store_id || !bill_amount) {
-    throw new Error('Missing redeem fields');
+  if (!store_id || !user_id || !amount) {
+    throw new Error('Missing fields');
   }
 
-  const max_system_percent = await getMaxSystemPercent();
-
-  const maxSystemAllowed = Math.floor(
-    Number(bill_amount) * (max_system_percent / 100)
-  );
-
-  const { data: userRows, error: userErr } = await supabase
-    .from('points_ledger')
-    .select('amount')
-    .eq('type', 'user')
-    .eq('owner_user_id', user_id)
-    .eq('store_id', store_id);
-
-  if (userErr) throw new Error(userErr.message);
-
-  const userBalance = userRows.reduce((s, r) => s + r.amount, 0);
-
-  const { data: systemRows, error: systemErr } = await supabase
-    .from('points_ledger')
-    .select('amount')
-    .eq('type', 'system')
-    .eq('store_id', store_id);
-
-  if (systemErr) throw new Error(systemErr.message);
-
-  const systemBalance = systemRows.reduce((s, r) => s + r.amount, 0);
-
-  const usableSystem = Math.min(systemBalance, maxSystemAllowed);
-
-  const totalDiscount = Math.min(
-    userBalance + usableSystem,
-    Math.floor(Number(bill_amount))
-  );
-
-  if (totalDiscount <= 0) {
-    return {
-      discount: 0,
-      used_user: 0,
-      used_system: 0
-    };
+  if (Number(amount) === 0) {
+    throw new Error('Amount cannot be zero');
   }
 
-  const usedUser = Math.min(userBalance, totalDiscount);
-  const usedSystem = totalDiscount - usedUser;
+  const { data: firm } = await supabase
+    .from('firms')
+    .select('id, status')
+    .eq('user_id', firmUserId)
+    .single();
 
-  const inserts = [];
-
-  if (usedUser > 0) {
-    inserts.push({
-      type: 'user',
-      owner_user_id: user_id,
-      store_id,
-      amount: -usedUser,
-      source: 'redeem'
-    });
+  if (!firm || firm.status !== 'active') {
+    throw new Error('Firm not active');
   }
 
-  if (usedSystem > 0) {
-    inserts.push({
-      type: 'system',
-      owner_user_id: null,
-      store_id,
-      amount: -usedSystem,
-      source: 'redeem'
-    });
+  const { data: store } = await supabase
+    .from('stores')
+    .select('id, firm_id, status')
+    .eq('id', store_id)
+    .single();
+
+  if (!store || store.status !== 'active') {
+    throw new Error('Store not active');
   }
 
-  const { error: insertErr } = await supabase
-    .from('points_ledger')
-    .insert(inserts);
+  if (store.firm_id !== firm.id) {
+    throw new Error('Store not in firm');
+  }
 
-  if (insertErr) throw new Error(insertErr.message);
+  const { data: txRows, error: txError } = await supabase
+    .from('transactions')
+    .select('amount, type')
+    .eq('store_id', store_id)
+    .eq('user_id', user_id);
+
+  if (txError) throw new Error(txError.message);
+
+  const balance = (txRows || []).reduce((sum, tx) => {
+    return tx.type === 'GIVE'
+      ? sum + Number(tx.amount)
+      : sum - Number(tx.amount);
+  }, 0);
+
+  if (Number(amount) < 0 && balance < Math.abs(Number(amount))) {
+    throw new Error('Insufficient user balance');
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert([
+      {
+        firm_id: firm.id,
+        store_id,
+        user_id,
+        amount: Math.abs(Number(amount)),
+        type: Number(amount) > 0 ? 'GIVE' : 'TAKE',
+        source: 'operational',
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  const newBalance =
+    Number(amount) > 0
+      ? balance + Number(amount)
+      : balance - Math.abs(Number(amount));
 
   return {
-    discount: totalDiscount,
-    used_user: usedUser,
-    used_system: usedSystem
+    success: true,
+    new_balance: newBalance,
   };
 }
