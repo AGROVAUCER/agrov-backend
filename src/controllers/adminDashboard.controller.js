@@ -76,3 +76,14 @@ export async function getFirmDashboardController(req, res) {
     return res.status(500).json({ error: err.message })
   }
 }
+export async function listUsersController(req, res) {
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers()
+
+    if (error) throw error
+
+    return res.json(data.users)
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+}

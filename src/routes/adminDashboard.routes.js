@@ -6,6 +6,7 @@ import express from 'express'
 import cors from 'cors'
 import { authMiddleware } from '../middleware/auth.js'
 import { requireRole } from '../middleware/requireRole.js'
+import { listUsersController } from '../controllers/adminDashboard.controller.js'
 import {
   listFirmsDashboardController,
   getFirmDashboardController,
@@ -40,7 +41,12 @@ router.get(
   requireRole('admin'),
   getFirmDashboardController
 )
-
+router.get(
+  '/admin/dashboard/users',
+  authMiddleware,
+  requireRole('admin'),
+  listUsersController
+)
 export default router
 
 
