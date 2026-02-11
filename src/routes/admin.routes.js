@@ -10,6 +10,10 @@ import {
   updateUserStatusController,
   listAuditLogsController
 } from '../controllers/admin.controller.js'
+import {
+  listAppUsersController,
+  toggleAppUserStatusController
+} from '../controllers/adminUsers.controller.js'
 
 const router = express.Router()
 
@@ -29,5 +33,18 @@ router.put('/users/:id/status', updateUserStatusController)
 
 // AUDIT
 router.get('/audit', listAuditLogsController)
+router.get(
+  '/admin/app-users',
+  authMiddleware,
+  requireRole('admin'),
+  listAppUsersController
+)
+
+router.patch(
+  '/admin/app-users/:id/toggle',
+  authMiddleware,
+  requireRole('admin'),
+  toggleAppUserStatusController
+)
 
 export default router

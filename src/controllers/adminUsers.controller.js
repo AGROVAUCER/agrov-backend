@@ -51,3 +51,48 @@ export async function toggleUserBlockController(req, res) {
     return res.status(500).json({ error: err.message })
   }
 }
+/**
+ * LIST MOBILE APP USERS
+ */
+export async function listAppUsersController(req, res) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, phone, active, created_at')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return res.json(data || [])
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+}
+
+/**
+ * TOGGLE MOBILE USER ACTIVE STATUS
+ */
+export async function toggleAppUserStatusController(req, res) {
+  try {
+    const { id } = req.params
+
+    const { data: user, error: findError } = await supabase
+      .from('users')
+      .select('id, active')
+      .eq('id', id)
+      .single()
+
+    if (findError) throw findError
+
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ active: !user.active })
+      .eq('id', id)
+
+    if (updateError) throw updateError
+
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+}
