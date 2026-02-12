@@ -21,6 +21,7 @@ import pointsRoutes from './routes/points.routes.js';
 import systemSettingsRoutes from './routes/systemSettings.routes.js'
 import adminUsersRoutes from './routes/adminUsers.routes.js'
 import mobileAuthRoutes from './modules/mobile-auth/mobileAuth.routes.js';
+import mobileUsersAdminRoutes from './modules/mobile-auth/mobileUsers.admin.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -58,6 +59,7 @@ app.use('/api', agrovPointsRoutes);
 app.use('/api/admin', systemSettingsRoutes);
 app.use('/api', adminUsersRoutes)
 app.use('/api', mobileAuthRoutes);
+app.use('/api', mobileUsersAdminRoutes);
 
 app.use('/api/points', redeemRoutes);
 app.use('/api/points', pointsRoutes);
