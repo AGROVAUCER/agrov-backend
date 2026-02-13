@@ -8,15 +8,20 @@ import {
 
 const router = express.Router();
 
-// Firma upisuje cenu
+/**
+ * Firma upisuje cenu
+ * Role mora biti manager ili admin (zavisno kako koristiš)
+ */
 router.post(
   '/market',
   authMiddleware,
-  requireRole('manager'), // ili 'admin' ako firma koristi tu rolu
+  requireRole('manager'),
   upsertMarketPrice
 );
 
-// Mobile app javni endpoint
+/**
+ * Mobile app javni endpoint
+ */
 router.get('/market/public', getPublicMarketPrices);
 
 export default router;
