@@ -6,18 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export async function getAllMobileUsers(req, res) {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('id, phone, first_name, last_name, active, created_at')
-    .order('created_at', { ascending: false });
+/* ================= GET MOBILE USERS (PAGINATION) ================= */
 
-  if (error) {
-    return res.status(500).json({ error: 'Failed to fetch users' });
-  }
-
-  return res.json(data);
-}
 export async function getAllMobileUsers(req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -69,7 +59,20 @@ export async function getAllMobileUsers(req, res) {
   }
 }
 
+/* ================= TOGGLE USER ================= */
 
+export async function toggleMobileUser(req, res) {
+  const { id } = req.params;
+
+  const { data: user, error: fetchError } = await supabase
+    .from('app_users')
+    .select('active')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (fetchError || !user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
   const { error } = await supabase
     .from('app_users')
@@ -81,7 +84,9 @@ export async function getAllMobileUsers(req, res) {
   }
 
   return res.json({ success: true });
+}
 
+/* ================= RESET PASSWORD ================= */
 
 export async function resetMobilePassword(req, res) {
   const { id } = req.params;
