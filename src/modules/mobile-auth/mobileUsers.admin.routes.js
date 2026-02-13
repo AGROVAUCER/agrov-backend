@@ -1,5 +1,5 @@
 import express from 'express';
-import { authMiddleware, requireRole } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireRole } from '../../middleware/authMiddleware.js';
 import {
   getAllMobileUsers,
   toggleMobileUser,
