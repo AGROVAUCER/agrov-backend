@@ -2,7 +2,8 @@ import {
   createFirmProfile,
   getMyFirm,
   approveFirm,
-  listAllFirms
+  listAllFirms,
+  toggleMarketForFirmService
 } from '../services/firms.service.js'
 
 export async function createFirmProfileController(req, res) {
@@ -42,5 +43,15 @@ export async function listAllFirmsController(req, res) {
   } catch (err) {
     console.error('listAllFirmsController error:', err)
     return res.status(500).json({ error: 'Failed to load firms' })
+  }
+}
+
+export async function toggleMarketForFirm(req, res) {
+  try {
+    const result = await toggleMarketForFirmService(req.params.id)
+    return res.status(200).json(result)
+  } catch (err) {
+    console.error('toggleMarketForFirm error:', err)
+    return res.status(500).json({ error: err.message })
   }
 }

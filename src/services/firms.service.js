@@ -22,6 +22,7 @@ export async function createFirmProfile(userId, payload) {
       owner_id: userId,
       ...payload,
       status: 'pending',
+      market_enabled: true
     })
     .select()
     .single()
@@ -51,4 +52,26 @@ export async function approveFirm(firmId) {
 
   if (error) throw error
   return data
+}
+
+/**
+ * Admin toggle market access (Opcija 2)
+ */
+export async function toggleMarketForFirmService(id) {
+  const { data: firm, error: fetchError } = await supabase
+    .from('firms')
+    .select('market_enabled')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchError || !firm) throw new Error('Firm not found')
+
+  const { error } = await supabase
+    .from('firms')
+    .update({ market_enabled: !firm.market_enabled })
+    .eq('id', id)
+
+  if (error) throw error
+
+  return { success: true }
 }
