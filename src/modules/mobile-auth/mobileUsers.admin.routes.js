@@ -1,5 +1,6 @@
 import express from 'express';
-import { authMiddleware, requireRole } from '../../middleware/authMiddleware.js';
+import { authMiddleware } from '../../middleware/auth.js';
+import { requireRole } from '../../middleware/requireRole.js';
 import {
   getAllMobileUsers,
   toggleMobileUser,
@@ -8,7 +9,6 @@ import {
 
 const router = express.Router();
 
-// Admin auth zaštita
 router.use(authMiddleware);
 router.use(requireRole('admin'));
 
