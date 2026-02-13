@@ -18,19 +18,58 @@ export async function getAllMobileUsers(req, res) {
 
   return res.json(data);
 }
+export async function getAllMobileUsers(req, res) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+    const status = req.query.status || null;
 
-export async function toggleMobileUser(req, res) {
-  const { id } = req.params;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-  const { data: user } = await supabase
-    .from('app_users')
-    .select('active')
-    .eq('id', id)
-    .maybeSingle();
+    let query = supabase
+      .from('app_users')
+      .select(
+        'id, phone, first_name, last_name, active, created_at',
+        { count: 'exact' }
+      );
 
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    if (search) {
+      query = query.or(
+        `phone.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`
+      );
+    }
+
+    if (status === 'active') {
+      query = query.eq('active', true);
+    }
+
+    if (status === 'blocked') {
+      query = query.eq('active', false);
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch users' });
+    }
+
+    return res.json({
+      data,
+      page,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+    });
+
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' });
   }
+}
+
+
 
   const { error } = await supabase
     .from('app_users')
@@ -42,7 +81,7 @@ export async function toggleMobileUser(req, res) {
   }
 
   return res.json({ success: true });
-}
+
 
 export async function resetMobilePassword(req, res) {
   const { id } = req.params;
