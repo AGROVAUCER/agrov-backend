@@ -1,43 +1,64 @@
-// src/controllers/qr.controller.js
-
 import { createClient } from '@supabase/supabase-js';
+import {
+  createQrSession,
+  confirmQrSession
+} from '../services/qr.service.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+/**
+ * Firma generiše QR
+ */
+export async function generateQr(req, res) {
+  try {
+    const firmId = req.auth.userId;
+    const { store_id, type, points } = req.body;
+
+    if (!store_id || !type || !points) {
+      return res.status(400).json({ error: 'Missing fields' });
+    }
+
+    const { data: firm } = await supabase
+      .from('firms')
+      .select('market_enabled')
+      .eq('id', firmId)
+      .maybeSingle();
+
+    if (!firm) {
+      return res.status(404).json({ error: 'Firm not found' });
+    }
+
+    const result = await createQrSession({
+      firm_id: firmId,
+      store_id,
+      type,
+      points
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * Mobile potvrđuje QR
+ */
 export async function claimQr(req, res) {
-  const { token } = req.body;
-  const userId = req.auth.userId;
+  try {
+    const { token } = req.body;
+    const userId = req.auth.userId;
 
-  const { data: claim, error } = await supabase
-    .from('points_claims')
-    .select('*')
-    .eq('token', token)
-    .eq('claimed', false)
-    .single();
+    const result = await confirmQrSession({
+      token,
+      userId
+    });
 
-  if (error || !claim) {
-    return res.status(400).json({ error: 'Invalid QR' });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
-
-  if (claim.user_id !== userId) {
-    return res.status(403).json({ error: 'Not your QR' });
-  }
-
-  await supabase.from('points_ledger').insert([{
-    type: 'user',
-    owner_user_id: userId,
-    store_id: claim.store_id,
-    amount: claim.points,
-    source: 'cashback'
-  }]);
-
-  await supabase
-    .from('points_claims')
-    .update({ claimed: true, claimed_at: new Date() })
-    .eq('id', claim.id);
-
-  res.json({ success: true });
 }
