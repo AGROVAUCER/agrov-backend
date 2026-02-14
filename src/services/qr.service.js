@@ -1,19 +1,51 @@
-import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+)
 
+/**
+ * Kreiranje jednokratnog QR session-a
+ * Validira da store pripada firmi
+ */
 export async function createQrSession({
   firm_id,
   store_id,
   type,
   points
 }) {
-  const token = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 60 * 1000); // 60 sec
+  if (!firm_id || !store_id || !type || !points) {
+    throw new Error('Missing fields')
+  }
+
+  if (!['earn', 'redeem'].includes(type)) {
+    throw new Error('Invalid type')
+  }
+
+  if (points <= 0) {
+    throw new Error('Points must be positive')
+  }
+
+  // 1️⃣ Validacija store-a
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, firm_id')
+    .eq('id', store_id)
+    .single()
+
+  if (storeError || !store) {
+    throw new Error('Store not found')
+  }
+
+  if (store.firm_id !== firm_id) {
+    throw new Error('Store does not belong to this firm')
+  }
+
+  // 2️⃣ Kreiranje tokena
+  const token = crypto.randomUUID()
+  const expiresAt = new Date(Date.now() + 60 * 1000)
 
   const { error } = await supabase
     .from('qr_sessions')
@@ -25,66 +57,44 @@ export async function createQrSession({
       token,
       expires_at: expiresAt,
       used: false
-    }]);
+    }])
 
-  if (error) throw error;
+  if (error) {
+    throw error
+  }
 
-  return { token, expires_at: expiresAt };
+  return {
+    token,
+    expires_at: expiresAt
+  }
 }
 
-export async function confirmQrSession({ token, userId }) {
-  const { data: session, error } = await supabase
-    .from('qr_sessions')
-    .select('*')
-    .eq('token', token)
-    .eq('used', false)
-    .single();
-
-  if (error || !session) {
-    throw new Error('Invalid QR');
+/**
+ * ATOMIC potvrda QR-a
+ */
+export async function confirmQrSession({
+  token,
+  userId
+}) {
+  if (!token || !userId) {
+    throw new Error('Missing token or user')
   }
 
-  if (new Date(session.expires_at) < new Date()) {
-    throw new Error('QR expired');
-  }
-
-  if (session.type === 'redeem') {
-    const { data: ledger } = await supabase
-      .from('points_ledger')
-      .select('amount')
-      .eq('owner_user_id', userId);
-
-    const balance = ledger.reduce((sum, row) => sum + row.amount, 0);
-
-    if (balance < session.points) {
-      throw new Error('Insufficient points');
+  const { data, error } = await supabase.rpc(
+    'confirm_qr_atomic',
+    {
+      p_token: token,
+      p_user_id: userId
     }
+  )
+
+  if (error) {
+    throw error
   }
 
-  const amount =
-    session.type === 'redeem'
-      ? -Math.abs(session.points)
-      : Math.abs(session.points);
+  if (data?.error) {
+    throw new Error(data.error)
+  }
 
-  const { error: ledgerError } = await supabase
-    .from('points_ledger')
-    .insert([{
-      type: 'user',
-      owner_user_id: userId,
-      store_id: session.store_id,
-      amount,
-      source: 'qr'
-    }]);
-
-  if (ledgerError) throw ledgerError;
-
-  await supabase
-    .from('qr_sessions')
-    .update({
-      used: true,
-      used_at: new Date()
-    })
-    .eq('id', session.id);
-
-  return { success: true };
+  return { success: true }
 }
