@@ -7,6 +7,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function sanitizeMobileUser(row) {
+  if (!row) return null;
+
+  const { password_hash, ...safeUser } = row;
+  return safeUser;
+}
+
 export async function registerUser({ phone, first_name, last_name, password }) {
   const { data: existing } = await supabase
     .from('app_users')
@@ -28,6 +35,7 @@ export async function registerUser({ phone, first_name, last_name, password }) {
         first_name,
         last_name,
         password_hash,
+        active: true,
       },
     ])
     .select()
@@ -42,13 +50,13 @@ export async function registerUser({ phone, first_name, last_name, password }) {
     phone: data.phone,
   });
 
-  return { user: data, token };
+  return { user: sanitizeMobileUser(data), token };
 }
 
 export async function loginUser({ phone, password }) {
   const { data, error } = await supabase
     .from('app_users')
-    .select('*')
+    .select('id, phone, first_name, last_name, active, created_at, password_hash')
     .eq('phone', phone)
     .maybeSingle();
 
@@ -71,5 +79,5 @@ export async function loginUser({ phone, password }) {
     phone: data.phone,
   });
 
-  return { user: data, token };
+  return { user: sanitizeMobileUser(data), token };
 }
