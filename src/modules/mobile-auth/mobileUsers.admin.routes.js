@@ -9,23 +9,11 @@ import {
 
 const router = express.Router();
 
-router.get(
-  '/admin/mobile-users',
-  authMiddleware,
-  requireRole('admin'),
-  getAllMobileUsers
-);
-router.put(
-  '/admin/mobile-users/:id/toggle',
-  authMiddleware,
-  requireRole('admin'),
-  toggleMobileUser
-);
-router.put(
-  '/admin/mobile-users/:id/reset-password',
-  authMiddleware,
-  requireRole('admin'),
-  resetMobilePassword
-);
+router.use(authMiddleware);
+router.use(requireRole('admin'));
+
+router.get('/admin/mobile-users', getAllMobileUsers);
+router.put('/admin/mobile-users/:id/toggle', toggleMobileUser);
+router.put('/admin/mobile-users/:id/reset-password', resetMobilePassword);
 
 export default router;

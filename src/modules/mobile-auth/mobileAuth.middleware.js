@@ -16,11 +16,6 @@ export function mobileAuthMiddleware(req, res, next) {
       userId: decoded.userId,
       phone: decoded.phone,
     };
-    req.auth = {
-      userId: decoded.userId,
-      phone: decoded.phone,
-      role: 'user',
-    };
 
     next();
   } catch (err) {
