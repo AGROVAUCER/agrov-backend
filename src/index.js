@@ -24,6 +24,7 @@ import mobileAuthRoutes from './modules/mobile-auth/mobileAuth.routes.js';
 import mobileUsersAdminRoutes from './modules/mobile-auth/mobileUsers.admin.routes.js';
 import marketRoutes from './modules/market/market.routes.js';
 import mobileRoutes from './routes/mobile.routes.js'
+import publicRoutes from './routes/public.routes.js'
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -64,6 +65,7 @@ app.use('/api', mobileAuthRoutes);
 app.use('/api', mobileUsersAdminRoutes);
 app.use('/api', marketRoutes);
 app.use('/api', mobileRoutes);
+app.use('/api', publicRoutes)
 
 app.use('/api/points', redeemRoutes);
 app.use('/api/points', pointsRoutes);
