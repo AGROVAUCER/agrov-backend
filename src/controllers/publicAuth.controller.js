@@ -21,10 +21,11 @@ export async function firmSignupController(req, res) {
       return res.status(400).json({ error: 'Missing email or password' })
     }
 
+    // 1) create auth user (role = firm)
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // da web može odmah da se uloguje (bez email_not_confirmed)
+      email_confirm: true,
       app_metadata: { role: 'firm' },
       user_metadata: {
         company_name,
@@ -35,8 +36,32 @@ export async function firmSignupController(req, res) {
     })
 
     if (error) return res.status(400).json({ error: error.message })
+    const userId = data.user.id
 
-    return res.json({ success: true, userId: data.user.id })
+    // 2) create firm row (pending by default)
+    const { data: firmRow, error: firmErr } = await supabaseAdmin
+      .from('firms')
+      .insert([
+        {
+          user_id: userId,
+          name: company_name || email,
+          pib: pib || null,
+          registration_number: registration_number || null,
+          contact_phone: contact_phone || null,
+          status: 'pending',
+          market_enabled: false,
+        },
+      ])
+      .select()
+      .single()
+
+    if (firmErr) {
+      // rollback auth user da ne ostane "siroče"
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return res.status(400).json({ error: firmErr.message })
+    }
+
+    return res.json({ success: true, userId, firm: firmRow })
   } catch (err) {
     return res.status(500).json({ error: err?.message || 'Signup failed' })
   }
