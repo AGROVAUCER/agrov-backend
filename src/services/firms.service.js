@@ -19,10 +19,10 @@ export async function createFirmProfile(userId, payload) {
   const { data, error } = await supabase
     .from('firms')
     .insert({
-      owner_id: userId,
+      user_id: userId,
       ...payload,
       status: 'pending',
-      market_enabled: true
+      market_enabled: true,
     })
     .select()
     .single()
@@ -35,7 +35,7 @@ export async function getMyFirm(userId) {
   const { data, error } = await supabase
     .from('firms')
     .select('*')
-    .eq('owner_id', userId)
+    .eq('user_id', userId)
     .single()
 
   if (error) throw error
