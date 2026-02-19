@@ -1,81 +1,56 @@
-/**
- * AGROV STORES CONTROLLER
- * - Prima HTTP zahteve
- * - Poziva stores.service
- * - Vraća standardizovane JSON odgovore
- */
-
 import {
   createStore,
   listMyStores,
-  approveStore
-} from '../services/stores.service.js';
+  approveStore,
+} from '../services/stores.service.js'
 
-/**
- * POST /stores
- * Firma kreira novu prodavnicu
- */
 export async function createStoreController(req, res) {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth
+    const { name, address, code } = req.body
 
     const store = await createStore({
-      userId,
-      payload: req.body
-    });
+      firmUserId: userId,
+      name,
+      address,
+      code,
+    })
 
-    return res.status(201).json({
-      success: true,
-      store
-    });
+    return res.status(201).json({ success: true, store })
   } catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
+    return res.status(400).json({ success: false, error: err.message })
   }
 }
 
 /**
- * GET /stores/me
- * Firma lista svoje prodavnice
+ * GET /stores/me?limit=20&cursor=...
+ * returns { items, nextCursor }
  */
 export async function listMyStoresController(req, res) {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth
+    const limitRaw = req.query.limit ? Number(req.query.limit) : 20
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20
+    const cursor = req.query.cursor ? String(req.query.cursor) : null
 
-    const stores = await listMyStores(userId);
+    const out = await listMyStores({
+      firmUserId: userId,
+      limit,
+      cursor,
+    })
 
-    return res.status(200).json({
-      success: true,
-      stores
-    });
+    return res.json(out)
   } catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
+    return res.status(400).json({ success: false, error: err.message })
   }
 }
 
-/**
- * POST /admin/stores/:id/approve
- * Admin odobrava prodavnicu
- */
 export async function approveStoreController(req, res) {
   try {
-    const { id } = req.params;
-
-    const store = await approveStore(id);
-
-    return res.status(200).json({
-      success: true,
-      store
-    });
+    const { id } = req.params
+    const store = await approveStore({ storeId: id })
+    return res.json({ success: true, store })
   } catch (err) {
-    return res.status(400).json({
-      success: false,
-      error: err.message
-    });
+    return res.status(400).json({ success: false, error: err.message })
   }
 }

@@ -1,139 +1,104 @@
-/**
- * AGROV STORES SERVICE
- * SCOPE:
- * - Firma kreira prodavnicu
- * - Firma lista svoje prodavnice
- * - Admin odobrava prodavnicu
- *
- * KANONSKA PRAVILA:
- * - Store uvek pripada firmi
- * - Firma MORA biti active da bi dodala store
- * - Store se uvek kreira kao pending
- * - Samo admin može da approve store (pending -> active)
- * - Store nema balans (deli balans firme)
- */
-
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+)
 
-/**
- * Firma kreira novu prodavnicu
- * @param {Object} params
- * @param {string} params.userId - auth user id firme
- * @param {Object} params.payload - podaci prodavnice
- */
-export async function createStore({ userId, payload }) {
-  // 1. Nađi firmu za ovog user-a
-  const { data: firm, error: firmError } = await supabase
+function encodeCursor(obj) {
+  return Buffer.from(JSON.stringify(obj), 'utf8').toString('base64')
+}
+
+function decodeCursor(cursor) {
+  try {
+    return JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
+async function getFirmByUser(firmUserId) {
+  const { data: firm, error } = await supabase
     .from('firms')
     .select('id, status')
-    .eq('user_id', userId)
-    .single();
+    .eq('user_id', firmUserId)
+    .single()
 
-  if (firmError || !firm) {
-    throw new Error('Firm not found');
-  }
+  if (error) throw new Error(error.message)
+  if (!firm) throw new Error('Firm not found')
+  if (firm.status !== 'active') throw new Error('Firm not active')
+  return firm
+}
 
-  // 2. Firma mora biti active
-  if (firm.status !== 'active') {
-    throw new Error('Firm is not approved');
-  }
+export async function createStore({ firmUserId, name, address = null, code = null }) {
+  if (!name || !String(name).trim()) throw new Error('Store name required')
 
-  // 3. Validacija inputa
-  const { name, address, code } = payload;
+  const firm = await getFirmByUser(firmUserId)
 
-  if (!name) {
-    throw new Error('Store name is required');
-  }
-
-  // 4. Kreiranje prodavnice (pending)
-  const { data: store, error: insertError } = await supabase
+  const { data, error } = await supabase
     .from('stores')
     .insert([
       {
         firm_id: firm.id,
-        name,
-        address: address || null,
-        code: code || null,
-        status: 'pending'
-      }
+        name: String(name).trim(),
+        address: address ? String(address).trim() : null,
+        code: code ? String(code).trim() : null,
+        status: 'pending', // admin approve
+      },
     ])
     .select()
-    .single();
+    .single()
 
-  if (insertError) {
-    throw new Error(insertError.message);
-  }
-
-  return store;
+  if (error) throw new Error(error.message)
+  return data
 }
 
 /**
- * Firma lista sve svoje prodavnice
- * @param {string} userId - auth user id firme
+ * returns { items, nextCursor }
+ * store može biti pending/active/blocked, firm vidi sve svoje
  */
-export async function listMyStores(userId) {
-  // 1. Nađi firmu
-  const { data: firm, error: firmError } = await supabase
-    .from('firms')
-    .select('id')
-    .eq('user_id', userId)
-    .single();
+export async function listMyStores({ firmUserId, limit = 20, cursor = null }) {
+  const firm = await getFirmByUser(firmUserId)
 
-  if (firmError || !firm) {
-    throw new Error('Firm not found');
-  }
-
-  // 2. Vrati sve prodavnice firme
-  const { data: stores, error } = await supabase
+  let q = supabase
     .from('stores')
-    .select('*')
+    .select('id, name, address, code, status, created_at')
     .eq('firm_id', firm.id)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit)
 
-  if (error) {
-    throw new Error(error.message);
+  const c = cursor ? decodeCursor(cursor) : null
+  if (c?.created_at && c?.id) {
+    q = q.or(
+      `created_at.lt.${c.created_at},and(created_at.eq.${c.created_at},id.lt.${c.id})`
+    )
   }
 
-  return stores;
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+
+  const items = data || []
+  const last = items[items.length - 1]
+  const nextCursor =
+    items.length === limit && last?.created_at && last?.id
+      ? encodeCursor({ created_at: last.created_at, id: last.id })
+      : null
+
+  return { items, nextCursor }
 }
 
-/**
- * Admin odobrava prodavnicu
- * @param {string} storeId
- */
-export async function approveStore(storeId) {
-  // 1. Nađi prodavnicu
-  const { data: store, error: findError } = await supabase
-    .from('stores')
-    .select('id, status')
-    .eq('id', storeId)
-    .single();
+export async function approveStore({ storeId }) {
+  if (!storeId) throw new Error('Store id required')
 
-  if (findError || !store) {
-    throw new Error('Store not found');
-  }
-
-  // 2. Može se odobriti samo pending
-  if (store.status !== 'pending') {
-    throw new Error(`Store cannot be approved from status: ${store.status}`);
-  }
-
-  // 3. Update statusa
-  const { data: updatedStore, error: updateError } = await supabase
+  const { data, error } = await supabase
     .from('stores')
     .update({ status: 'active' })
     .eq('id', storeId)
     .select()
-    .single();
+    .single()
 
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
-
-  return updatedStore;
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Store not found')
+  return data
 }
