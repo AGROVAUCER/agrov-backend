@@ -26,6 +26,8 @@ import mobileUsersAdminRoutes from './modules/mobile-auth/mobileUsers.admin.rout
 import marketRoutes from './modules/market/market.routes.js'
 import mobileRoutes from './routes/mobile.routes.js'
 import publicRoutes from './routes/public.routes.js'
+import receiptsRoutes from './routes/receipts.routes.js'
+import receiptTransactionsRoutes from './routes/receiptTransactions.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 10000
@@ -78,9 +80,13 @@ app.use('/api', mobileAuthRoutes)
 app.use('/api', mobileUsersAdminRoutes)
 app.use('/api', marketRoutes)
 app.use('/api', mobileRoutes)
+app.use('/api', receiptsRoutes)
+app.use('/api', receiptTransactionsRoutes)
 
 app.use('/api/points', redeemRoutes)
 app.use('/api/points', pointsRoutes)
+app.use('/api', receiptsRoutes)
+app.use('/api', receiptTransactionsRoutes)
 
 /* =========================
    STATIC

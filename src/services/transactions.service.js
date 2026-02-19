@@ -1,7 +1,8 @@
 /**
- * OPERATIVNE TRANSAKCIJE
+ * OPERATIVNE TRANSAKCIJE (NOVO)
  * - store + user
  * - source = operational
+ * - cursor pagination
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -11,6 +12,10 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+/* =======================================================
+   CREATE OPERATIONAL TRANSACTION
+======================================================= */
 
 export async function createOperationalTransaction({
   firmUserId,
@@ -27,24 +32,30 @@ export async function createOperationalTransaction({
     throw new Error('Invalid type')
   }
 
+  if (Number(amount) <= 0) {
+    throw new Error('Invalid amount')
+  }
+
   // firma
-  const { data: firm } = await supabase
+  const { data: firm, error: firmErr } = await supabase
     .from('firms')
     .select('id, status')
     .eq('user_id', firmUserId)
     .single()
 
+  if (firmErr) throw new Error(firmErr.message)
   if (!firm || firm.status !== 'active') {
     throw new Error('Firm not active')
   }
 
   // store
-  const { data: store } = await supabase
+  const { data: store, error: storeErr } = await supabase
     .from('stores')
     .select('id, firm_id, status')
     .eq('id', store_id)
     .single()
 
+  if (storeErr) throw new Error(storeErr.message)
   if (!store || store.status !== 'active') {
     throw new Error('Store not active')
   }
@@ -84,25 +95,19 @@ export async function createOperationalTransaction({
   return tx
 }
 
-/**
- * GET /transactions/me
- * Firma lista svoje transakcije (source-of-truth = backend)
- *
- * Filtri:
- * - store_id (opciono)
- * - limit (default 50, max 200)
- * - from/to (ISO datumi, opciono) filtriranje po created_at
- */
+/* =======================================================
+   LIST MY TRANSACTIONS (CURSOR PAGINATION)
+======================================================= */
+
 export async function listMyOperationalTransactions({
   firmUserId,
   store_id = null,
   limit = 50,
-  from = null,
-  to = null,
+  cursor = null,
 }) {
   if (!firmUserId) throw new Error('Missing firm user id')
 
-  // firma (vezivanje preko firms.user_id)
+  // firma
   const { data: firm, error: firmErr } = await supabase
     .from('firms')
     .select('id, status')
@@ -114,11 +119,11 @@ export async function listMyOperationalTransactions({
     throw new Error('Firm not active')
   }
 
-  // ako je prosleđen store_id, validiraj da pripada firmi (stores.firm_id)
+  // validacija store-a
   if (store_id) {
     const { data: store, error: storeErr } = await supabase
       .from('stores')
-      .select('id, firm_id, status')
+      .select('id, firm_id')
       .eq('id', store_id)
       .single()
 
@@ -127,19 +132,43 @@ export async function listMyOperationalTransactions({
     if (store.firm_id !== firm.id) throw new Error('Forbidden store')
   }
 
-  let q = supabase
+  // limit zaštita
+  limit = Number(limit) || 50
+  limit = Math.min(Math.max(limit, 1), 100)
+
+  let query = supabase
     .from('transactions')
     .select('*')
     .eq('firm_id', firm.id)
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .order('id', { ascending: false })
+    .limit(limit + 1)
 
-  if (store_id) q = q.eq('store_id', store_id)
-  if (from) q = q.gte('created_at', from)
-  if (to) q = q.lte('created_at', to)
+  if (store_id) {
+    query = query.eq('store_id', store_id)
+  }
 
-  const { data, error } = await q
+  if (cursor) {
+    const [createdAt, id] = cursor.split('|')
+    query = query.or(
+      `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`
+    )
+  }
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  return data || []
+  let items = data || []
+  let nextCursor = null
+
+  if (items.length > limit) {
+    const last = items[limit - 1]
+    nextCursor = `${last.created_at}|${last.id}`
+    items = items.slice(0, limit)
+  }
+
+  return {
+    items,
+    nextCursor,
+  }
 }
