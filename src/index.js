@@ -112,7 +112,9 @@ app.use('/exports', express.static('exports'))
 app.get('/health', (_, res) => {
   res.json({ status: 'ok' })
 })
-
+app.get('/build', (_, res) => {
+  res.json({ build: 'INDEX_V2_MARKET_PUBLIC_OK' })
+})
 /* =========================
    START SERVER
    ========================= */
