@@ -1,6 +1,5 @@
 import express from 'express'
 import { authMiddleware } from '../../middleware/auth.js'
-import { requireRole } from '../../middleware/requireRole.js'
 import {
   upsertMarketPrice,
   getPublicMarketPrices,
@@ -9,20 +8,13 @@ import {
 
 const router = express.Router()
 
-/**
- * Firma upisuje cenu
- */
-router.post('/market', authMiddleware, requireRole('manager'), upsertMarketPrice)
+// Firma upisuje cenu (bez role; controller proverava da li je to firma + market_enabled)
+router.post('/market', authMiddleware, upsertMarketPrice)
 
-/**
- * Javno – trenutne cene
- */
+// Javno – trenutne cene
 router.get('/market/public', getPublicMarketPrices)
 
-/**
- * Javno – istorija cena
- * /api/market/public/history?days=30&product=Kukuruz
- */
+// Javno – istorija cena
 router.get('/market/public/history', getPublicMarketPriceHistory)
 
 export default router
