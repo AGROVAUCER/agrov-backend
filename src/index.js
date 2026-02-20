@@ -7,27 +7,33 @@ import express from 'express'
 import cors from 'cors'
 
 // ROUTES
-import firmsRoutes from './routes/firms.routes.js'
-import storesRoutes from './routes/stores.routes.js'
-import adminTransactionsRoutes from './routes/adminTransactions.routes.js'
-import balanceRoutes from './routes/balance.routes.js'
-import transactionsRoutes from './routes/transactions.routes.js'
-import monthlySummaryRoutes from './routes/monthlySummary.routes.js'
-import pdfReportRoutes from './routes/pdfReport.routes.js'
-import adminDashboardRoutes from './routes/adminDashboard.routes.js'
-import exportRoutes from './routes/export.routes.js'
-import agrovPointsRoutes from './routes/agrovPoints.routes.js'
-import redeemRoutes from './routes/redeem.routes.js'
-import pointsRoutes from './routes/points.routes.js'
-import systemSettingsRoutes from './routes/systemSettings.routes.js'
-import adminUsersRoutes from './routes/adminUsers.routes.js'
-import mobileAuthRoutes from './modules/mobile-auth/mobileAuth.routes.js'
-import mobileUsersAdminRoutes from './modules/mobile-auth/mobileUsers.admin.routes.js'
-import marketRoutes from './modules/market/market.routes.js'
-import mobileRoutes from './routes/mobile.routes.js'
 import publicRoutes from './routes/public.routes.js'
+
+import mobileAuthRoutes from './modules/mobile-auth/mobileAuth.routes.js'
+import mobileRoutes from './routes/mobile.routes.js'
 import receiptsRoutes from './routes/receipts.routes.js'
 import receiptTransactionsRoutes from './routes/receiptTransactions.routes.js'
+
+import marketRoutes from './modules/market/market.routes.js'
+
+import firmsRoutes from './routes/firms.routes.js'
+import storesRoutes from './routes/stores.routes.js'
+import transactionsRoutes from './routes/transactions.routes.js'
+
+import redeemRoutes from './routes/redeem.routes.js'
+import pointsRoutes from './routes/points.routes.js'
+
+// ADMIN (MORA POD /api/admin)
+import adminTransactionsRoutes from './routes/adminTransactions.routes.js'
+import adminDashboardRoutes from './routes/adminDashboard.routes.js'
+import adminUsersRoutes from './routes/adminUsers.routes.js'
+import systemSettingsRoutes from './routes/systemSettings.routes.js'
+import exportRoutes from './routes/export.routes.js'
+import pdfReportRoutes from './routes/pdfReport.routes.js'
+import monthlySummaryRoutes from './routes/monthlySummary.routes.js'
+import agrovPointsRoutes from './routes/agrovPoints.routes.js'
+import balanceRoutes from './routes/balance.routes.js'
+import mobileUsersAdminRoutes from './modules/mobile-auth/mobileUsers.admin.routes.js'
 
 const app = express()
 const PORT = process.env.PORT || 10000
@@ -42,7 +48,7 @@ app.use(
       'http://localhost:3000',
       'http://localhost:5173',
       'https://agrov-admin.vercel.app',
-      'https://agrov-frontend.onrender.com' // <-- ZAMENI AKO TI JE DRUGI FRONTEND
+      'https://agrov-frontend.onrender.com',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -51,7 +57,6 @@ app.use(
 )
 
 app.options('*', cors())
-
 app.use(express.json())
 
 /* =========================
@@ -61,32 +66,38 @@ app.use(express.json())
 app.use('/api/public', publicRoutes)
 
 /* =========================
-   PROTECTED ROUTES
+   PUBLIC / FIRM / MOBILE ROUTES
+   (NE SMEJU BITI POD ADMIN GUARDOM)
    ========================= */
+
+app.use('/api', marketRoutes)
+app.use('/api', mobileAuthRoutes)
+app.use('/api', mobileRoutes)
 
 app.use('/api', firmsRoutes)
 app.use('/api', storesRoutes)
-app.use('/api', adminTransactionsRoutes)
-app.use('/api', balanceRoutes)
 app.use('/api', transactionsRoutes)
-app.use('/api', monthlySummaryRoutes)
-app.use('/api', pdfReportRoutes)
-app.use('/api', adminDashboardRoutes)
-app.use('/api', exportRoutes)
-app.use('/api', agrovPointsRoutes)
-app.use('/api/admin', systemSettingsRoutes)
-app.use('/api', adminUsersRoutes)
-app.use('/api', mobileAuthRoutes)
-app.use('/api', mobileUsersAdminRoutes)
-app.use('/api', marketRoutes)
-app.use('/api', mobileRoutes)
+
 app.use('/api', receiptsRoutes)
 app.use('/api', receiptTransactionsRoutes)
 
 app.use('/api/points', redeemRoutes)
 app.use('/api/points', pointsRoutes)
-app.use('/api', receiptsRoutes)
-app.use('/api', receiptTransactionsRoutes)
+
+/* =========================
+   ADMIN ROUTES (SVE POD /api/admin)
+   ========================= */
+
+app.use('/api/admin', adminTransactionsRoutes)
+app.use('/api/admin', adminDashboardRoutes)
+app.use('/api/admin', adminUsersRoutes)
+app.use('/api/admin', systemSettingsRoutes)
+app.use('/api/admin', exportRoutes)
+app.use('/api/admin', pdfReportRoutes)
+app.use('/api/admin', monthlySummaryRoutes)
+app.use('/api/admin', agrovPointsRoutes)
+app.use('/api/admin', balanceRoutes)
+app.use('/api/admin', mobileUsersAdminRoutes)
 
 /* =========================
    STATIC
