@@ -3,10 +3,14 @@
  * - store + user
  * - source = operational
  * - cursor pagination
+ *
+ * Pravilo (SAMO 3%):
+ * - GIVE: amount = iznos računa (RSD), points = floor(amount * 0.03)
+ * - TAKE: amount = broj bodova za skidanje, points = isti broj
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { createCashback } from './points.service.js'
+import { givePoints, takePoints } from './points.service.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -23,8 +27,9 @@ export async function createOperationalTransaction({
   user_id,
   amount,
   type,
+  receipt_id = null,
 }) {
-  if (!store_id || !user_id || !amount || !type) {
+  if (!store_id || !user_id || amount === undefined || amount === null || !type) {
     throw new Error('Missing fields')
   }
 
@@ -32,7 +37,8 @@ export async function createOperationalTransaction({
     throw new Error('Invalid type')
   }
 
-  if (Number(amount) <= 0) {
+  const amt = Number(amount)
+  if (!Number.isFinite(amt) || amt <= 0) {
     throw new Error('Invalid amount')
   }
 
@@ -64,30 +70,51 @@ export async function createOperationalTransaction({
     throw new Error('Store not in firm')
   }
 
+  // points
+  let points = 0
+  if (type === 'GIVE') {
+    points = Math.floor(amt * 0.03)
+  } else {
+    points = Math.floor(amt) // TAKE: amount je broj bodova
+  }
+
+  if (points <= 0) throw new Error('Points computed as 0')
+
   // insert transaction
-  const { data: tx, error } = await supabase
+  const { data: tx, error: txErr } = await supabase
     .from('transactions')
     .insert([
       {
         firm_id: firm.id,
         store_id,
         user_id,
-        amount,
+        amount: amt,
         type,
         source: 'operational',
+        receipt_id: receipt_id || null,
+        points,
       },
     ])
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
+  if (txErr) throw new Error(txErr.message)
 
-  // cashback (samo za kupovinu)
-  if (type === 'TAKE') {
-    await createCashback({
+  // apply effects
+  if (type === 'GIVE') {
+    await givePoints({
       user_id,
       store_id,
-      amount,
+      firm_id: firm.id,
+      amount_rsd: amt,
+      transaction_id: tx.id,
+    })
+  } else {
+    await takePoints({
+      user_id,
+      store_id,
+      firm_id: firm.id,
+      points,
       transaction_id: tx.id,
     })
   }
