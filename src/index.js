@@ -96,6 +96,9 @@ app.use('/api/admin', monthlySummaryRoutes)
 app.use('/api/admin', agrovPointsRoutes)
 app.use('/api/admin', balanceRoutes)
 app.use('/api/admin', mobileUsersAdminRoutes)
+
+// ALIAS: expose balance routes under /api as well (frontend calls /api/balance)
+app.use('/api', balanceRoutes)
 // kompatibilni aliasi bez /api/admin prefiksa (stari buildovi)
 app.use('/', adminDashboardAliasRoutes)
 
