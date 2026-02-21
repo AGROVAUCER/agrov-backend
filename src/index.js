@@ -19,6 +19,7 @@ import marketRoutes from './modules/market/market.routes.js'
 import firmsRoutes from './routes/firms.routes.js'
 import storesRoutes from './routes/stores.routes.js'
 import transactionsRoutes from './routes/transactions.routes.js'
+import usersRoutes from './routes/users.routes.js'
 
 import redeemRoutes from './routes/redeem.routes.js'
 import pointsRoutes from './routes/points.routes.js'
@@ -77,6 +78,7 @@ app.use('/api', mobileRoutes)
 app.use('/api', firmsRoutes)
 app.use('/api', storesRoutes)
 app.use('/api', transactionsRoutes)
+app.use('/api', usersRoutes)
 
 app.use('/api', receiptsRoutes)
 app.use('/api', receiptTransactionsRoutes)
