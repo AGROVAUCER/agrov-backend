@@ -17,41 +17,41 @@ import {
 const router = express.Router();
 
 /**
- * POST /admin/firms/:id/credit
+ * POST /firms/:id/credit (mounted under /api/admin)
  */
 router.post(
-  '/admin/firms/:id/credit',
+  '/firms/:id/credit',
   authMiddleware,
   requireRole('admin'),
   adminCreditFirmController
 );
 
 /**
- * POST /admin/firms/:id/debit
+ * POST /firms/:id/debit (mounted under /api/admin)
  */
 router.post(
-  '/admin/firms/:id/debit',
+  '/firms/:id/debit',
   authMiddleware,
   requireRole('admin'),
   adminDebitFirmController
 );
 
 /**
- * GET /admin/firms/:id/system-transactions
+ * GET /firms/:id/system-transactions (mounted under /api/admin)
  */
 router.get(
-  '/admin/firms/:id/system-transactions',
+  '/firms/:id/system-transactions',
   authMiddleware,
   requireRole('admin'),
   listSystemTransactionsController
 );
 
 /**
- * GET /admin/transactions
+ * GET /transactions (mounted under /api/admin)
  * KANONSKI
  */
 router.get(
-  '/admin/transactions',
+  '/transactions',
   authMiddleware,
   requireRole('admin'),
   listAllAdminTransactionsController

@@ -18,7 +18,7 @@ router.get(
 
 // admin vidi ukupne agrov poene
 router.get(
-  '/admin/agrov/balance',
+  '/agrov/balance',
   authMiddleware,
   requireRole('admin'),
   getTotalAgrovBalanceController

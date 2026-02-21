@@ -12,7 +12,7 @@ const router = express.Router()
 
 // UPDATE FIRM STATUS
 router.put(
-  '/admin/firms/:id/status',
+  '/firms/:id/status',
   authMiddleware,
   requireRole('admin'),
   changeFirmStatusController
@@ -20,7 +20,7 @@ router.put(
 
 // BLOCK / UNBLOCK ADMIN USER
 router.put(
-  '/admin/users/:id/block',
+  '/users/:id/block',
   authMiddleware,
   requireRole('admin'),
   toggleUserBlockController
@@ -28,7 +28,7 @@ router.put(
 
 // LIST MOBILE APP USERS
 router.get(
-  '/admin/app-users',
+  '/app-users',
   authMiddleware,
   requireRole('admin'),
   listAppUsersController
@@ -36,7 +36,7 @@ router.get(
 
 // TOGGLE MOBILE USER STATUS
 router.patch(
-  '/admin/app-users/:id/toggle',
+  '/app-users/:id/toggle',
   authMiddleware,
   requireRole('admin'),
   toggleAppUserStatusController

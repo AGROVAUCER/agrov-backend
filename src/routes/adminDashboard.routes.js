@@ -20,7 +20,7 @@ router.options('*', cors())
 
 // DASHBOARD STATS
 router.get(
-  '/admin/dashboard/stats',
+  '/dashboard/stats',
   authMiddleware,
   requireRole('admin'),
   getDashboardStatsController
@@ -28,7 +28,7 @@ router.get(
 
 // LISTA FIRMI
 router.get(
-  '/admin/dashboard/firms',
+  '/dashboard/firms',
   authMiddleware,
   requireRole('admin'),
   listFirmsDashboardController
@@ -36,13 +36,13 @@ router.get(
 
 // DETALJ FIRME
 router.get(
-  '/admin/dashboard/firms/:id',
+  '/dashboard/firms/:id',
   authMiddleware,
   requireRole('admin'),
   getFirmDashboardController
 )
 router.get(
-  '/admin/dashboard/users',
+  '/dashboard/users',
   authMiddleware,
   requireRole('admin'),
   listUsersController

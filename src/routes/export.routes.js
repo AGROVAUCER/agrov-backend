@@ -13,7 +13,7 @@ const router = express.Router()
  * GET /api/admin/export
  */
 router.get(
-  '/admin/export',
+  '/export',
   authMiddleware,
   requireRole('admin'),
   listExportJobsController
@@ -25,7 +25,7 @@ router.get(
  * body: { type: 'firms' | 'stores' | 'transactions' | 'balances' }
  */
 router.post(
-  '/admin/export',
+  '/export',
   authMiddleware,
   requireRole('admin'),
   createExportJobController

@@ -10,21 +10,21 @@ import {
 const router = express.Router()
 
 router.get(
-  '/admin/reports',
+  '/reports',
   authMiddleware,
   requireRole('admin'),
   listReportsController
 )
 
 router.post(
-  '/admin/firms/:id/reports/:year/:month',
+  '/firms/:id/reports/:year/:month',
   authMiddleware,
   requireRole('admin'),
   generateMonthlyReportController
 )
 
 router.get(
-  '/admin/reports/:reportId/pdf',
+  '/reports/:reportId/pdf',
   authMiddleware,
   requireRole('admin'),
   downloadReportController

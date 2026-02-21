@@ -10,10 +10,10 @@ import { getMonthlySummaryAdminController } from '../controllers/monthlySummary.
 const router = express.Router();
 
 /**
- * GET /admin/firms/:id/summary/:year/:month
+ * GET /firms/:id/summary/:year/:month (mounted under /api/admin)
  */
 router.get(
-  '/admin/firms/:id/summary/:year/:month',
+  '/firms/:id/summary/:year/:month',
   authMiddleware,
   requireRole('admin'),
   getMonthlySummaryAdminController

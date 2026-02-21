@@ -10,7 +10,7 @@ import {
 const router = express.Router()
 
 router.get('/balance/me', authMiddleware, requireRole('firm'), getMyBalanceController)
-router.get('/admin/firms/:id/balance', authMiddleware, requireRole('admin'), getFirmBalanceAdminController)
+router.get('/firms/:id/balance', authMiddleware, requireRole('admin'), getFirmBalanceAdminController)
 router.get('/balance', authMiddleware, requireRole('admin'), getSystemBalanceAdminController)
 
 export default router
