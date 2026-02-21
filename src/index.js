@@ -46,12 +46,7 @@ const PORT = process.env.PORT || 10000
 
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'https://agrov-admin.vercel.app',
-      'https://agrov-frontend.onrender.com',
-    ],
+    origin: true, // dozvoli sve origin-e (frontend preview/i)
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
