@@ -29,7 +29,7 @@ export async function upsertMarketPrice(req, res) {
 
     const { data: firm, error: firmError } = await supabase
       .from('firms')
-      .select('market_enabled')
+      .select('id, market_enabled')
       .eq('user_id', userId)
       .maybeSingle()
 
@@ -44,7 +44,7 @@ export async function upsertMarketPrice(req, res) {
     // pročitaj trenutnu vrednost da ne spamujemo istoriju istim podatkom
     const { data: existing, error: existingErr } = await supabase
       .from('market_prices')
-      .select('price, currency')
+      .select('id, price, currency')
       .eq('firm_id', firm?.id)
       .eq('product', product)
       .maybeSingle()
@@ -58,20 +58,31 @@ export async function upsertMarketPrice(req, res) {
     const prevPrice = existing?.price === undefined ? undefined : Number(existing?.price)
     const prevCurrency = String(existing?.currency || 'RSD').toUpperCase()
 
-    const { error: upsertError } = await supabase
-      .from('market_prices')
-      .upsert(
-        {
-          firm_id: firm?.id,
-          product,
+    // manual upsert (update if exists, else insert) da ne tražimo unique index
+    let upsertError = null
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('market_prices')
+        .update({
           price: numericPrice,
           currency: nextCurrency,
           updated_at: new Date(),
-        },
-        { onConflict: 'firm_id,product' }
-      )
+        })
+        .eq('id', existing.id)
+      upsertError = error
+    } else {
+      const { error } = await supabase.from('market_prices').insert({
+        firm_id: firm?.id,
+        product,
+        price: numericPrice,
+        currency: nextCurrency,
+        updated_at: new Date(),
+      })
+      upsertError = error
+    }
 
     if (upsertError) {
+      console.error('market upsert error', upsertError)
       return res.status(500).json({ error: 'Failed to save price' })
     }
 
@@ -84,7 +95,7 @@ export async function upsertMarketPrice(req, res) {
     if (changed) {
       // namerno: ako istorija failuje, ne rušimo glavni upsert
       await supabase.from('market_price_history').insert({
-        firm_id: firmId,
+        firm_id: firm?.id,
         product,
         price: numericPrice,
         currency: nextCurrency,
