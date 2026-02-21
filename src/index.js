@@ -27,6 +27,7 @@ import pointsRoutes from './routes/points.routes.js'
 // ADMIN (MORA POD /api/admin)
 import adminTransactionsRoutes from './routes/adminTransactions.routes.js'
 import adminDashboardRoutes from './routes/adminDashboard.routes.js'
+import adminDashboardAliasRoutes from './routes/adminDashboard.alias.routes.js'
 import adminUsersRoutes from './routes/adminUsers.routes.js'
 import systemSettingsRoutes from './routes/systemSettings.routes.js'
 import exportRoutes from './routes/export.routes.js'
@@ -100,6 +101,8 @@ app.use('/api/admin', monthlySummaryRoutes)
 app.use('/api/admin', agrovPointsRoutes)
 app.use('/api/admin', balanceRoutes)
 app.use('/api/admin', mobileUsersAdminRoutes)
+// kompatibilni aliasi bez /api/admin prefiksa (stari buildovi)
+app.use('/', adminDashboardAliasRoutes)
 
 /* =========================
    STATIC
