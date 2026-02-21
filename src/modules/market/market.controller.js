@@ -15,7 +15,7 @@ const supabase = createClient(
  */
 export async function upsertMarketPrice(req, res) {
   try {
-    const firmId = req.auth.userId
+    const userId = req.auth.userId
     const { product, price, currency } = req.body
 
     if (!product || price === undefined) {
@@ -30,7 +30,7 @@ export async function upsertMarketPrice(req, res) {
     const { data: firm, error: firmError } = await supabase
       .from('firms')
       .select('market_enabled')
-      .eq('id', firmId)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (firmError || !firm) {
@@ -45,7 +45,7 @@ export async function upsertMarketPrice(req, res) {
     const { data: existing, error: existingErr } = await supabase
       .from('market_prices')
       .select('price, currency')
-      .eq('firm_id', firmId)
+      .eq('firm_id', firm?.id)
       .eq('product', product)
       .maybeSingle()
 
@@ -61,7 +61,7 @@ export async function upsertMarketPrice(req, res) {
       .from('market_prices')
       .upsert(
         {
-          firm_id: firmId,
+          firm_id: firm?.id,
           product,
           price: numericPrice,
           currency: nextCurrency,
