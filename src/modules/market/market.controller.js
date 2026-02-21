@@ -49,12 +49,13 @@ export async function upsertMarketPrice(req, res) {
       .eq('product', product)
       .maybeSingle()
 
+    // Ako kolone/cena ne postoje, nastavljamo sa podrazumevanim vrednostima
     if (existingErr) {
-      return res.status(500).json({ error: 'Failed to read current price' })
+      console.warn('market existingErr ignored:', existingErr?.message || existingErr)
     }
 
     const nextCurrency = String(currency || existing?.currency || 'RSD').toUpperCase()
-    const prevPrice = existing?.price === undefined ? undefined : Number(existing.price)
+    const prevPrice = existing?.price === undefined ? undefined : Number(existing?.price)
     const prevCurrency = String(existing?.currency || 'RSD').toUpperCase()
 
     const { error: upsertError } = await supabase
